@@ -16,7 +16,7 @@
       "rhea"
     ],
     "defaultLanguage": "en-US",
-    "enableProposedAPI": true
+    "enableProposedAPI": false
   },
   "scripts": {
     "build": "fitbit-build",

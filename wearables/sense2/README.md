@@ -6,7 +6,8 @@ access, displays BPM/status on the watch and sends individual sensor readings to
 its companion inside the paired Fitbit/Google Health Android app.
 
 The official npm beta SDK `@fitbit/sdk@6.2.0-pre.1` includes the `rhea` Sense 2
-build target. The package builds with that SDK and proposed APIs enabled. This is
+build target. The package builds with that SDK using device API 8.2.0 and companion
+API 3.3.0, without proposed APIs. This is
 not a claim that current Sense 2 firmware permits installation or supports every
 sensor API. No live watch reading has been verified yet.
 
@@ -19,9 +20,14 @@ sensor API. No live watch reading has been verified yet.
 - SDK developer login was attempted on 2026-10-29, but the browser authorization
   route showed 403 Forbidden and did not return an authorization callback.
 - Gallery App Manager sign-in and developer registration succeeded. A private
-  STRIDE HR Probe clockface draft has been created; package upload and publication
-  are pending. Developer ID / App Cluster configuration is unnecessary because
-  this probe does not request app-cluster storage.
+  STRIDE HR Probe clockface draft has been created and the FBA attached. The
+  authorized Publish Clockface action returned a generic HTTP 400, both with
+  proposed APIs and explicit API versions, including a clean-page retry. No
+  installation link or uploaded version was created. The page and console logs
+  exposed no more specific validation reason; the cause is unresolved.
+- Developer ID / App Cluster configuration is unnecessary because this probe
+  does not request app-cluster storage. The proposed-API flag is disabled because
+  none of the probe's imports require it; its removal did not fix publication.
 - The watch has not been installed or tested. Do not label readings live until
   a companion-side `HR_PROBE` log records fresh sensor samples on actual hardware.
 
