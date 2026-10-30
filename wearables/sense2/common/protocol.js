@@ -8,7 +8,8 @@ export function inspectFrame(frame, nowMs) {
       !Number.isInteger(frame.sequence) || frame.sequence < 1) {
     return { ok: false, reason: 'invalid_sequence' };
   }
-  if (frame.status !== 'ok' || frame.onWrist === false) return { ok: false, reason: frame.status || 'off_wrist' };
+  if (frame.status !== 'ok') return { ok: false, reason: frame.status || 'invalid_status' };
+  if (frame.onWrist !== true) return { ok: false, reason: frame.onWrist === false ? 'off_wrist' : 'unknown_wear_state' };
   if (!Number.isFinite(frame.bpm) || frame.bpm <= 0 || frame.bpm > 300 ||
       !Number.isFinite(frame.observedAtMs) || !Number.isFinite(frame.ageMs) || frame.ageMs < 0) {
     return { ok: false, reason: 'invalid_reading' };

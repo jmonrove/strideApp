@@ -41,17 +41,20 @@ function publish() {
 }
 function startSensor() {
   if (paused) return;
-  if (onWrist === false) { status = 'off_wrist'; publish(); return; }
+  if (onWrist !== true) { status = onWrist === false ? 'off_wrist' : 'waiting_for_wear'; publish(); return; }
   if (hrm) { status = 'waiting'; hrm.start(); }
 }
-if (!me.permissions.granted('access_heart_rate')) {
+if (!me.permissions.granted('access_heart_rate') || !me.permissions.granted('access_activity')) {
   status = 'permission_denied';
 } else if (!HeartRateSensor) {
   status = 'unsupported';
+} else if (!BodyPresenceSensor) {
+  // Unknown wear state must not be used as trustworthy input for workout guidance.
+  status = 'wear_detection_unavailable';
 } else {
   hrm = new HeartRateSensor({ frequency: 1 });
   hrm.addEventListener('reading', () => {
-    if (paused || onWrist === false) return;
+    if (paused || onWrist !== true) return;
     // Repeated cached timestamps must not masquerade as fresh sensor readings.
     if (hrm.timestamp === null || hrm.timestamp === sensorTimestamp) return;
     sensorTimestamp = hrm.timestamp;
@@ -65,9 +68,18 @@ if (!me.permissions.granted('access_heart_rate')) {
   if (BodyPresenceSensor) {
     body = new BodyPresenceSensor();
     body.addEventListener('reading', () => {
+      const wasOnWrist = onWrist;
       onWrist = body.present;
       if (!onWrist) { hrm.stop(); status = 'off_wrist'; publish(); }
-      else startSensor();
+      // Presence events may repeat while worn. Restarting on every event clears
+      // a good BPM to "waiting" and can repeatedly restart HR acquisition.
+      else if (wasOnWrist !== true) startSensor();
+    });
+    body.addEventListener('error', () => {
+      onWrist = false;
+      hrm.stop();
+      status = 'wear_detection_error';
+      publish();
     });
     body.start();
   }

@@ -1,6 +1,6 @@
 {
   "name": "stride-sense2-probe",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
@@ -10,6 +10,7 @@
     "appDisplayName": "STRIDE HR Probe",
     "requestedPermissions": [
       "access_heart_rate",
+      "access_activity",
       "access_internet"
     ],
     "buildTargets": [
@@ -21,6 +22,7 @@
   "scripts": {
     "build": "fitbit-build",
     "debug": "fitbit",
+    "usb": "node tools/usb-probe.cjs",
     "test": "node --test test/*.test.mjs"
   },
   "devDependencies": {

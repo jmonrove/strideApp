@@ -11,33 +11,98 @@ API 3.3.0, without proposed APIs. This is
 not a claim that current Sense 2 firmware permits installation or supports every
 sensor API. No live watch reading has been verified yet.
 
-## Current validation
+## Current validation (2026-10-30)
 
 - Watch, companion and settings components build to `build/app.fba`.
-- Ten Node tests cover schema validation, delayed/stale readings, future clocks,
+- Sixteen Node tests cover schema validation, delayed/stale readings, future clocks,
   off-wrist/paused state, duplicate heartbeats, retired sessions, stalled delivery,
-  and opt-in authenticated forwarding.
+  opt-in authenticated forwarding, missing watch permissions, missing wear
+  detection, failure of wear detection while streaming, and repeated presence
+  events preserving fresh BPM without restarting acquisition.
 - SDK developer login was attempted on 2026-10-29, but the browser authorization
   route showed 403 Forbidden and did not return an authorization callback.
 - The phone's Developer Bridge was found under the Sense 2 device page and
   enabled after developer registration. General Settings / Services / Labs was
   the wrong location. Relay discovery still fails with no stored SDK auth token;
   enabling the phone bridge does not complete the Mac's SDK sign-in.
-- Local USB discovery returned no watch hosts. A watch-side USB debug test is
-  pending because its charger was unavailable. The newer CLI 1.8.0-pre.11 was
-  inspected: it has the same authentication implementation and production relay
+- With the watch connected and USB debugging enabled, macOS enumerates a Fitbit
+  Sense 2 (`2687:fd13`). The beta SDK's USB/PULSE developer handshake succeeds.
+  The watch reports family `rhea`, firmware `60.20001.220.31`, maximum API
+  `10.1.0`, a 336×336 screen, and app installation/launch/screenshot support.
+- The watch component was installed and launched over local USB using the
+  unchanged SDK transport and sideload modules. A watch screenshot verifies the
+  probe UI, `waiting for wear`, `Phone disconnected`, and zero samples while
+  connected to its charger. A visible running UI is verified; actual BPM is not.
+- The first device run exposed a missing `access_activity` permission required
+  by BodyPresenceSensor. The corrected manifest requests it only for detecting
+  wear state; the probe does not read steps, activity history, or daily goals.
+  Missing permission/detection and unknown wear state now fail closed.
+- The standard CLI starts cloud sign-in before USB discovery and the SDK token
+  remains absent. The documented `www.fitbit.com/oauth2/authorize` endpoint was
+  also tested with the SDK's original client, PKCE/state and token handler; it
+  visibly returned 403 Forbidden. No callback/token was obtained. The endpoint
+  test was stopped; no authentication protection was bypassed. The newer CLI
+  1.8.0-pre.11 has the same authentication implementation and production relay
   configuration as pre.10, so it was not substituted as an unproven login fix.
 - Gallery App Manager sign-in and developer registration succeeded. A private
   STRIDE HR Probe clockface draft has been created and the FBA attached. The
   authorized Publish Clockface action returned a generic HTTP 400, both with
   proposed APIs and explicit API versions, including a clean-page retry. No
-  installation link or uploaded version was created. The page and console logs
+  installation link or uploaded version was created. On 2026-10-30, the user
+  authorized the corrected 0.1.1 rights warranty and a single private publication
+  attempt. That attempt logged `ApolloError: Failed to fetch`. A subsequent
+  read-only reload required renewing the existing Google sign-in; afterward the
+  Gallery app list explicitly said "Waiting for at least one version to be
+  uploaded." No published version or installation link was created. No second
+  publish attempt was made. The page and console logs
   exposed no more specific validation reason; the cause is unresolved.
 - Developer ID / App Cluster configuration is unnecessary because this probe
   does not request app-cluster storage. The proposed-API flag is disabled because
   none of the probe's imports require it; its removal did not fix publication.
-- The watch has not been installed or tested. Do not label readings live until
+- The phone companion has not been installed. Do not label the whole path live until
   a companion-side `HR_PROBE` log records fresh sensor samples on actual hardware.
+- In the first wrist test, the user reported 22 sensor events but a current
+  `waiting` / `--` display. This is not verified fresh BPM. The presence callback
+  restarted HR acquisition and cleared display state even for repeated unchanged
+  on-wrist events. The correction starts sensing only on a transition onto the
+  wrist; a regression test preserves a fresh reading across repeated events.
+  Corrected build `0ea56b0356d71976` was installed and its launch acknowledged;
+  a screenshot verifies `off wrist` and zero samples on its charger. The first
+  corrected install returned success but its launch timed out, followed by an
+  `App not installed` reply on a fresh connection. A subsequent bounded install
+  and launch succeeded. The cause of that intermittent installation failure is
+  unresolved; no automatic retry loop is used.
+
+## Repeat the local USB watch test
+
+From this directory, with the watch on the Mac-connected charger and watch-side
+USB debugging enabled:
+
+```sh
+npm ci
+npm test
+npm run build
+npm run usb -- info
+npm run usb -- install
+npm run usb -- launch
+npm run usb -- screenshot /absolute/path/to/new-watch-screenshot.png
+```
+
+`tools/usb-probe.cjs` loads the pinned SDK's `USBDebugHost`, `HostConnection`,
+`sideload.app` and screenshot helper. It accepts exactly one discoverable Fitbit
+USB debug host and retains the SDK's package/device compatibility checks. It
+never signs in, modifies the SDK, extracts an account token, or calls a cloud
+endpoint. It installs **only the watch component**, then launches it. There is
+no phone companion role on this USB host. Operations stop after 90 seconds,
+release the USB connection, and do not retry. Existing screenshot files are not
+overwritten. `launch` does not reinstall and can diagnose whether the probe is
+still installed. Error messages include the build ID because the watch may replay
+errors from an earlier build when reconnecting.
+
+To test sensing, remove the watch from its charger, wear it, and keep the probe
+face active. Check for `ok`, a BPM value and an increasing sensor count. This
+disconnects the USB debugger, so watch-visible readings are only watch-side
+evidence. The phone remains a separate installation/transport checkpoint.
 
 ## Build
 
@@ -70,7 +135,7 @@ Some experimental workflows also require the watch on its USB charger with
 Developer Bridge / USB debugging enabled in watch settings. These options and the
 private app-installation route must be verified on the installed versions.
 
-After installation, approve heart-rate access on the watch. Keep this clock face
+After installation, approve requested access if prompted. Keep this clock face
 active and the paired phone app open for the first test. It does not promise to
 keep running when the built-in Exercise app replaces it. Watch screen-off and
 phone-background behavior are part of the test, not established capabilities.
@@ -115,6 +180,8 @@ transport and controller verification remain prerequisites for physical adaptati
 ## References
 
 - [Official heart-rate guide](https://dev.fitbit.com/build/guides/sensors/heart-rate/)
+- [Official permission guide](https://dev.fitbit.com/build/guides/permissions/)
+- [Official OAuth authorization endpoint](https://dev.fitbit.com/build/reference/web-api/authorization/authorize/)
 - [Official messaging guide](https://dev.fitbit.com/build/guides/communications/messaging/)
 - [Official publishing guide](https://dev.fitbit.com/build/guides/publishing/)
 - [Google support developer-mode instructions](https://support.google.com/googlehealth/thread/433273147/how-to-enable-developer-mode?hl=en)

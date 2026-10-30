@@ -18,6 +18,12 @@ test('rejects off-wrist and paused readings even when a BPM remains cached', () 
  }
  const f=frame();f.onWrist=false;assert.equal(inspectFrame(f,now).ok,false);
 });
+test('unknown or malformed wear state cannot qualify a heart-rate sample', () => {
+ for (const onWrist of [null, undefined, 1, 'true']) {
+  const f=frame();f.onWrist=onWrist;
+  assert.equal(inspectFrame(f,now).reason,'unknown_wear_state');
+ }
+});
 test('rejects null, non-finite, invalid HR and malformed sequence', () => {
  for(const bpm of [null,NaN,Infinity,-1,0,301,'110']) {
   const f=frame();f.bpm=bpm;assert.equal(inspectFrame(f,now).ok,false);
