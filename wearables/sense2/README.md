@@ -15,7 +15,7 @@ photos; continuous acquisition and watch-to-phone forwarding are not.
 ## Current validation (2026-10-30)
 
 - Watch, companion and settings components build to `build/app.fba`.
-- Fifty-six Node tests cover schema validation, delayed/stale readings, future clocks,
+- Sixty-two Node tests cover schema validation, delayed/stale readings, future clocks,
   off-wrist/paused state, duplicate heartbeats, retired sessions, stalled delivery,
   opt-in authenticated forwarding, missing watch permissions, missing wear
   detection, failure of wear detection while streaming, and repeated presence
@@ -419,3 +419,30 @@ reported “App not installed,” one bounded reinstall and launch acknowledged
 0.1.9 build `031f1de14c509a59`. Its read-only startup log reported `stopped`.
 No exercise was started remotely. Corrected on-watch lifecycle verification
 remains pending; unit-test results do not establish physical stop timing.
+
+### Completed wrist test and statistics comparison 0.1.10
+
+After the user completed the 0.1.9 test and reconnected USB, a screenshot showed
+`Test complete: 5 readings, max gap 33s`. Reaching this completion path requires
+an observed native start followed by `stopped`; it confirms that the corrected
+lifecycle completed on this run, though exact native stop latency was not
+measured. The whole-runtime counters showed eight events, eight unique/eligible
+readings, one sensor start, and 129 timer callbacks over 132 seconds. That runtime
+includes time outside the test and cannot be used to calculate its sampling rate.
+No raw biometric values or screenshots are checked into the repository.
+
+Five eligible readings and a 33-second maximum gap do not establish a usable
+stream for the controller's five-second freshness requirement. Revision 0.1.10
+compares the sensor channel with read-only `exercise.stats` during another
+explicitly started test. It counts valid native-stat polls, BPM value changes,
+advancing exercise time, unavailable/error reads, and longest same-value/wait
+interval. The completion screen freezes these counters alongside sensor count,
+sensor maximum gap, native state, state-event count, and start-confirmation delay.
+
+ExerciseStats has no HR acquisition timestamp. A poll or BPM value change is
+therefore only comparison evidence; an unchanged BPM may also represent genuine
+new measurements. Neither polls nor changes enter HR frames, refresh observation
+timestamps, advance sensor sequence, or count as eligible sensor readings. Native
+stats errors cannot interrupt the existing start/stop lifecycle or passive HR.
+All 62 tests and the FBA build pass, including isolation of the statistics channel
+and freezing comparison counters after completion. No new permissions are added.

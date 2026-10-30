@@ -71,7 +71,7 @@ function phoneLabel() {
 }
 function render() {
   const now = new Date();
-  ui.clock.text = 'DIAG 0.1.9  ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+  ui.clock.text = 'DIAG 0.1.10  ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
   ui.bpm.text = status === 'ok' ? String(latestBpm) : '--';
   ui.state.text = status.replace(/_/g, ' ');
   ui.link.text = phoneLabel() + (buttonTaps ? ' / taps ' + buttonTaps : '');
@@ -88,6 +88,14 @@ function render() {
     ui.wear.text = test.failure.detail.length > 48 ? test.failure.detail.slice(48, 96) : 'Fitbit state now: ' + test.failure.state;
   }
   if (test.owned && !test.failure) ui.link.text = 'Fitbit ' + test.nativeState + ' / events ' + test.stateEvents + ' / taps ' + buttonTaps;
+  if (test.phase === 'done' && !test.failure && test.stats) {
+    ui.raw.text = 'Sensor: ' + test.samples + ' readings / gap ' + test.maxGapSec + 's';
+    ui.last.text = 'Stats: ' + test.stats.validPolls + '/' + test.stats.polls + ' valid polls';
+    ui.wear.text = 'Stats changes: ' + test.stats.changes + ' / same-wait ' + test.stats.maxSameSec + 's';
+    ui.count.text = 'Stats time advances: ' + test.stats.timeAdvances + ' / errors ' + test.stats.errors;
+    ui.runtime.text = 'Start delay ' + Math.ceil(test.startDelayMs / 1000) + 's / events ' + test.stateEvents;
+    ui.link.text = 'Fitbit ' + test.nativeState + ' / stats untimestamped';
+  }
   ui.exercise.text = test.phase === 'active' ? 'TEST ' + test.remainingSec + 's / ' + test.samples + ' reads / gap ' + test.maxGapSec + 's' : test.phase === 'starting' ? test.message + ' / ' + test.waitSec + 's' : test.phase === 'idle' && !exerciseInfo.valid ? 'Exercise state: ' + exerciseInfo.state : test.message;
   ui['exercise-label'].text = test.phase === 'starting' ? 'Cancel start' : test.phase === 'stopping' ? 'Stopping...' : test.owned ? 'Stop test' : test.phase === 'armed' ? 'Confirm recording' : 'Start 60s test';
 }

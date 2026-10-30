@@ -174,6 +174,15 @@ test('watch UI follows delayed native start and stop instead of dropping the tes
  h.tick();assert.equal(stops,1);nativeExercise.state='stopped';nativeExercise.onstatechange();h.tick();
  assert.equal(h.ui['exercise-label'].text,'Start 60s test');assert.match(h.ui.exercise.text,/Test complete/);
 });
+test('native stats polls do not qualify heartbeat frames as fresh sensor readings',()=>{
+ const nativeExercise={state:'stopped',stats:{activeTime:0,heartRate:{current:140}},start(){this.state='started';},stop(){this.state='stopped';}};
+ const h=setup({nativeExercise});h.wear(true);h.ui['exercise-toggle'].events.click();h.ui['exercise-toggle'].events.click();
+ for(let i=0;i<10;i++){nativeExercise.stats.activeTime+=1000;nativeExercise.stats.heartRate.current++;h.tick();}
+ assert.equal(h.ui.bpm.text,'--');assert.equal(h.sent.at(-1).sequence,0);assert.equal(h.sent.at(-1).bpm,null);
+ h.tick(50000);assert.equal(h.ui['exercise-label'].text,'Start 60s test');
+ assert.match(h.ui.raw.text,/Sensor: 0 readings/);assert.match(h.ui.last.text,/valid polls/);
+ assert.match(h.ui.link.text,/stats untimestamped/);
+});
 test('denied or unsupported exercise access leaves passive heart-rate readings functional',()=>{
  for(const exercisePermission of [false,true]){
   const h=setup({exercisePermission});h.wear(true);

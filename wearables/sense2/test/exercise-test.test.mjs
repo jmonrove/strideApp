@@ -141,3 +141,17 @@ test('optional native state-event binding failure leaves polling and lifecycle c
  h.start();h.api.state='started';h.advance();assert.equal(h.controller.snapshot().phase,'active');
  h.controller.stop('Probe closed');assert.equal(h.stops,1);assert.equal(h.controller.snapshot().owned,false);
 });
+test('exercise stats comparison freezes at completion and does not count polls as sensor samples',()=>{
+ const h=setup();h.api.stats={activeTime:0,heartRate:{current:100}};h.start();
+ h.api.stats.activeTime=1000;h.advance();h.api.stats.heartRate.current=101;h.advance();
+ assert.equal(h.controller.snapshot().samples,0);assert.equal(h.controller.snapshot().stats.changes,1);
+ h.controller.reading();h.advance(58000);const result=h.controller.snapshot();
+ assert.equal(result.phase,'done');assert.equal(result.nativeState,'stopped');assert.equal(result.samples,1);
+ const frozen=result.stats;h.advance(90000);assert.deepEqual(h.controller.snapshot().stats,frozen);
+});
+test('a throwing native stats getter cannot break exercise stop or own the sensor stream',()=>{
+ const h=setup();Object.defineProperty(h.api,'stats',{get(){throw Error('Unsupported stats');}});
+ h.start();h.advance();assert.equal(h.controller.snapshot().phase,'active');assert.equal(h.controller.snapshot().samples,0);
+ h.advance(59000);assert.equal(h.stops,1);assert.equal(h.controller.snapshot().phase,'done');
+ assert.equal(h.controller.snapshot().stats.errors,2);
+});

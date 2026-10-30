@@ -1,6 +1,6 @@
 <svg class="background">
   <text id="title" x="50%" y="25">STRIDE HR PROBE</text>
-  <text id="clock" x="50%" y="46">DIAG 0.1.9</text>
+  <text id="clock" x="50%" y="46">DIAG 0.1.10</text>
   <text id="bpm" x="50%" y="111">--</text>
   <text id="state" x="50%" y="136">Waiting for sensor</text>
   <text id="raw" x="50%" y="157">raw HR null / TS null</text>

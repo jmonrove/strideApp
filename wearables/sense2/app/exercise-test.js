@@ -1,10 +1,12 @@
 // Inspection only reads metadata. Native state changes may arrive after calls return.
+import { createStatsDiagnostic } from './exercise-stats.js';
 export function createExerciseTest(options) {
   let phase = 'idle', message = '60s test: creates Fitbit activity';
   let api = null, owned = false, armedUntil = 0, startedAt = 0, lastClock = 0;
   let callbacks = 0, samples = 0, lastSampleAt = 0, maxGapMs = 0, failure = null;
   let startPending = false, cancelRequested = false, stopSent = false, stopSentAt = 0;
   let stopReason = '', state = 'unchecked', stateEvents = 0, startDelayMs = null;
+  let statsDiagnostic = null;
   const startWaitMs = 10000, stopWaitMs = 10000;
   function clock() {
     const v = options.now();
@@ -52,13 +54,14 @@ export function createExerciseTest(options) {
   function snapshot() {
     const elapsed = owned ? Math.max(0, lastClock - startedAt) : 0;
     return {phase, message, owned, samples, failure, nativeState:state, stateEvents, startDelayMs,
+      stats:statsDiagnostic ? statsDiagnostic.snapshot(lastClock) : null,
       maxGapSec:Math.ceil(maxGapMs / 1000),
       remainingSec:owned ? Math.max(0, 60 - Math.floor(elapsed / 1000)) : 0,
       waitSec:phase === 'starting' ? Math.max(0, Math.ceil((startWaitMs - elapsed) / 1000)) : 0};
   }
   function finish(time, reason) {
     maxGapMs = Math.max(maxGapMs, Math.max(0, time - (lastSampleAt || startedAt)));
-    owned = false; phase = 'done';
+    lastClock = time; owned = false; phase = 'done';
     message = reason + ': ' + samples + ' readings, max gap ' + Math.ceil(maxGapMs / 1000) + 's';
     changed(); return snapshot();
   }
@@ -89,7 +92,12 @@ export function createExerciseTest(options) {
       if (cancelRequested && !stopSent) return sendStop(time);
       if (stopSent) {
         if (time - stopSentAt >= stopWaitMs) { phase = 'error'; message = 'Stop unconfirmed: end exercise in Fitbit'; }
-      } else { phase = 'active'; message = 'Recording test activity'; }
+      } else {
+        phase = 'active'; message = 'Recording test activity';
+        // Comparison only: never forwarded as timestamped heart-rate input.
+        try { statsDiagnostic.observe(api.stats, time); }
+        catch (_) { statsDiagnostic.failed(time); }
+      }
     } else if (current === 'stopped') {
       if (!startPending) return finish(time, stopReason || 'Exercise ended outside this probe');
       if (time - startedAt >= startWaitMs) {
@@ -140,6 +148,7 @@ export function createExerciseTest(options) {
     } catch (_) { api = null; phase = 'unsupported'; message = 'Exercise API unavailable; HR still works'; changed(); return snapshot(); }
     startedAt = clock(); lastClock = startedAt; callbacks = 0;
     samples = 0; lastSampleAt = 0; maxGapMs = 0; stateEvents = 0; startDelayMs = null;
+    statsDiagnostic = createStatsDiagnostic(startedAt);
     owned = true; startPending = true; cancelRequested = false; stopSent = false; stopReason = '';
     phase = 'starting'; message = 'Starting; waiting for Fitbit';
     // Events supplement polling; callbacks never make native writes themselves.
