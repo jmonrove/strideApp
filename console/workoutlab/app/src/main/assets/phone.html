@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>STRIDE Workout Lab</title>
+<style>
+body{font:17px system-ui,sans-serif;background:#101820;color:#eef5f8;margin:0;padding:20px;max-width:720px;margin:auto}h1{font-size:26px;margin-bottom:8px}.notice{background:#263b47;padding:14px;border-radius:10px;color:#bce6ff}label{display:block;margin-top:16px}input,select,button{font:inherit;box-sizing:border-box;border-radius:8px;border:1px solid #597684;padding:12px;max-width:100%}input,select{width:100%;background:#192833;color:white}button{background:#bce6ff;color:#101820;margin:8px 4px 0 0}.stop{background:#ffb1a4}.metrics{display:flex;flex-wrap:wrap;gap:14px;margin:18px 0}.metric{flex:1;min-width:130px;background:#192833;padding:15px;border-radius:10px}.value{display:block;font-size:30px;font-weight:bold}#message{min-height:48px;color:#ffde9c}small{color:#a8c1ce}#status{white-space:pre-wrap;font:14px monospace}
+</style></head><body>
+<h1>STRIDE Workout Lab</h1><div class="notice"><strong>SIMULATION ONLY — no motor connection.</strong><br>All pace and incline values are proposals. Demo heart-rate targets are not a training prescription.</div>
+<label>Pairing token from the tablet<input id="token" type="password" autocomplete="off"></label><button id="pair">Connect preview</button>
+<div class="metrics"><div class="metric">Proposed MPH<span class="value" id="mph">—</span></div><div class="metric">Proposed grade<span class="value" id="grade">—</span></div><div class="metric">Heart rate<span class="value" id="bpm">—</span></div></div>
+<div id="message">Enter the token shown on the tablet.</div>
+<label>Routine<select id="routine"></select></label><label>Duration in minutes<input id="minutes" type="number" min="1" max="120" value="20"></label>
+<button id="start">Start preview</button><button id="pause">Pause</button><button id="resume">Resume automation</button><button id="stop" class="stop">Stop preview</button>
+<label>Sensor input<select id="sensor"><option value="SIMULATED">Simulated heart rate</option><option value="PHONE">Sense 2 phone bridge</option></select></label><button id="setSensor">Use selected sensor</button>
+<label>Simulated BPM<input id="simBpm" type="number" min="30" max="240" value="120"></label><button id="simulate">Set simulated BPM</button>
+<label>Manual proposed speed (MPH)<input id="manualSpeed" type="number" min="0" step="0.1" value="2"></label><label>Manual proposed grade (%)<input id="manualGrade" type="number" step="0.1" value="0"></label><button id="manual">Take manual control</button>
+<p><small>A signal dropout suspends automation. Fresh readings do not restart it: press Resume automation. The phone API never connects to the treadmill controller.</small></p><pre id="status"></pre>
+<script>
+(function(){
+var token='',paired=false,timer=null;
+function $(id){return document.getElementById(id)}
+function message(text){$('message').textContent=text}
+function api(path,body){var options={headers:{Authorization:'Bearer '+token},cache:'no-store'};if(body){options.method='POST';options.headers['Content-Type']='application/json';options.body=JSON.stringify(body)}return fetch(path,options).then(function(r){return r.json().then(function(data){if(!r.ok)throw Error(data.error||'Request rejected');return data})})}
+function render(s){$('mph').textContent=s.proposedSpeedMph.toFixed(2);$('grade').textContent=s.proposedInclinePercent.toFixed(1)+'%';$('bpm').textContent=s.heartRateBpm===null?'—':Math.round(s.heartRateBpm)+(s.heartRateFresh?'':' (stale)');message(s.state+' · '+s.phase+' · '+s.reason);$('status').textContent='Sensor: '+s.sensor+'\nElapsed: '+Math.floor(s.elapsedSec)+' / '+s.durationSec+' seconds\nDemo target: '+s.targetLowBpm+'–'+s.targetHighBpm+' BPM\nLimits: '+s.limits.maxSpeedMph+' MPH / '+s.limits.maxInclinePercent+'%\nHeart rate may adjust speed: '+s.adaptiveSpeed}
+function action(data){if(!paired)return message('Connect the preview first.');api('/action',data).then(render).catch(function(e){message(e.message)})}
+$('pair').onclick=function(){token=$('token').value.trim();api('/routines').then(function(list){$('routine').textContent='';list.forEach(function(r){var o=document.createElement('option');o.value=r.id;o.textContent=r.name;$('routine').appendChild(o)});paired=true;if(timer)clearInterval(timer);timer=setInterval(function(){api('/status').then(render).catch(function(e){paired=false;clearInterval(timer);message(e.message)})},1000);return api('/status')}).then(render).catch(function(e){message(e.message)})};
+$('start').onclick=function(){action({action:'start',routine:$('routine').value,minutes:Number($('minutes').value)})};['pause','resume','stop'].forEach(function(id){$(id).onclick=function(){action({action:id})}});
+$('setSensor').onclick=function(){action({action:'sensor',source:$('sensor').value})};$('simulate').onclick=function(){action({action:'simulate',bpm:Number($('simBpm').value)})};$('manual').onclick=function(){action({action:'manual',speedMph:Number($('manualSpeed').value),inclinePercent:Number($('manualGrade').value)})};
+})();
+</script></body></html>

@@ -1,0 +1,10 @@
+<svg class="background">
+  <text id="title" x="50%" y="42">STRIDE HR PROBE</text>
+  <text id="clock" x="50%" y="76">--:--</text>
+  <text id="bpm" x="50%" y="164">--</text>
+  <text id="state" x="50%" y="201">Waiting for sensor</text>
+  <text id="link" x="50%" y="238">Phone disconnected</text>
+  <text id="count" x="50%" y="266">0 samples</text>
+  <rect id="toggle" x="50%-80" y="283" width="160" height="42" rx="12" fill="#163a48" />
+  <text id="toggle-label" x="50%" y="312">Pause stream</text>
+</svg>

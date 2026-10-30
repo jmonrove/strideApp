@@ -365,7 +365,11 @@ class HeartRate(
     private fun open(dev: BluetoothDevice?, autoConnect: Boolean) {
         if (dev == null || wanted.isBlank()) return
         gatt = try {
-            dev.connectGatt(context, autoConnect, callback, BluetoothDevice.TRANSPORT_LE)
+            if (android.os.Build.VERSION.SDK_INT >= 23) {
+                dev.connectGatt(context, autoConnect, callback, BluetoothDevice.TRANSPORT_LE)
+            } else {
+                dev.connectGatt(context, autoConnect, callback)
+            }
         } catch (e: SecurityException) {
             Log.w(FitProConnection.TAG, "hr: no connect permission")
             null

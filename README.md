@@ -1,5 +1,12 @@
 # STRIDE
 
+This fork adds an experimental Android 5.1 port and a separate
+[Workout Lab](console/workoutlab/README.md) with four simulated routines and a
+phone interface. A [Sense 2 heart-rate probe](wearables/sense2/README.md) is being
+tested as a sensor source. The Lab runs on the older console, but neither live
+Sense 2 streaming nor motor control on that console has been validated. See
+[port status](docs/ANDROID_5_PORT.md). The original project's documentation follows.
+
 **Replace the iFit software on a NordicTrack treadmill. Keep the belt, lose the subscription.**
 
 **Please note**: This is a hobby project by one person and Claude Code, please don't get upset at that. Claude Code is enabling me to be able to do something I've dreamed of doing for a few years but didn't have the ability. Now I'm able to walk/run on my own physical hardware that I bought without it having someone else's subscription software on it. If you don't like that 90% of this was coded with AI tools like Claude Code - then this isn't the project for you. If you want to fork this, put your fingerprints all over it ... please do, I'd welcome that!

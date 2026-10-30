@@ -26,7 +26,7 @@ android {
 
     defaultConfig {
         applicationId = "dev.stride.hud"
-        minSdk = 28
+        minSdk = 22
         targetSdk = 28
         // Bumped per release, because the About screen is the only place
         // anyone can see which build is on a console, and "0.1-spike · build 1"
@@ -84,6 +84,11 @@ android {
     }
 
     lint {
+        // Run with -PcompatLint to check the Android 5.1 API boundary separately
+        // from existing Bluetooth permission findings for newer Android versions.
+        if (providers.gradleProperty("compatLint").isPresent) {
+            checkOnly += setOf("NewApi", "InlinedApi")
+        }
         /*
          * One check, off, with a reason.
          *

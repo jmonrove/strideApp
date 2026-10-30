@@ -1,0 +1,8 @@
+.background { viewport-fill: #08151c; }
+text { fill: #d8eaf0; font-family: System-Regular; text-anchor: middle; text-length: 40; font-size: 18; }
+#title { fill: #6dd6e9; font-size: 22; }
+#clock { fill: #9bb5c1; font-size: 22; }
+#bpm { fill: white; font-size: 88; font-family: System-Bold; }
+#state { fill: #80d7b2; }
+#count { fill: #9bb5c1; font-size: 16; }
+#toggle-label { fill: white; }

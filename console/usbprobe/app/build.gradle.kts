@@ -9,9 +9,9 @@ android {
 
     defaultConfig {
         applicationId = "dev.stride.usbprobe"
-        minSdk = 28
-        // Console is Android 9. Targeting 28 avoids newer background/permission
-        // restrictions we have no use for on a single-purpose kiosk device.
+        minSdk = 22
+        // Sideloaded on Android 5.1 and 9 consoles; retain the original target
+        // so newer USB permission behavior does not change during this port.
         targetSdk = 28
         versionCode = 1
         versionName = "0.1-probe"
@@ -21,6 +21,11 @@ android {
         release {
             isMinifyEnabled = false
         }
+    }
+
+    lint {
+        // This diagnostic is sideloaded, not submitted to Google Play.
+        disable += "ExpiredTargetSdkVersion"
     }
 
     compileOptions {

@@ -19,9 +19,11 @@ import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
 import android.view.View
+import android.webkit.WebSettings
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Button
 import kotlin.concurrent.thread
 
 /**
@@ -50,6 +52,7 @@ class MainActivity : Activity() {
     private lateinit var headerView: TextView
     private lateinit var maskView: TextView
     private lateinit var logView: TextView
+    private lateinit var readButton: Button
 
     @Volatile private var running = false
     private var connection: UsbDeviceConnection? = null
@@ -106,6 +109,12 @@ class MainActivity : Activity() {
         }
         root.addView(headerView)
 
+        readButton = Button(this).apply {
+            text = "Read input reports (board idle)"
+            isEnabled = false
+        }
+        root.addView(readButton)
+
         maskView = TextView(this).apply {
             setTextColor(Color.parseColor("#FFDC00"))
             textSize = 15f
@@ -120,16 +129,8 @@ class MainActivity : Activity() {
             typeface = Typeface.MONOSPACE
             gravity = Gravity.TOP
         }
-        val scroll = ScrollView(this).apply { addView(logView) }
-        root.addView(
-            scroll,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0
-            ).apply { weight = 1f }
-        )
-
-        setContentView(root)
+        root.addView(logView)
+        setContentView(ScrollView(this).apply { addView(root) })
         window.decorView.systemUiVisibility =
             View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
     }
@@ -144,20 +145,31 @@ class MainActivity : Activity() {
                     "pid=0x${it.productId.toString(16)} ${it.manufacturerName} / ${it.productName}")
         }
 
+        val inventory = StringBuilder("USB inventory — Android ${Build.VERSION.RELEASE}\n")
+        inventory.append("${Build.MANUFACTURER} / ${Build.MODEL}\n")
+        inventory.append("build ${Build.DISPLAY}\n")
+        inventory.append("WebView: ${WebSettings.getDefaultUserAgent(this)}\n")
+        inventory.append("${all.size} USB device(s); no interface claimed\n\n")
+        all.forEach { device ->
+            inventory.append(describe(device)).append("\n\n")
+        }
+        setHeader(inventory.toString().trimEnd())
+
         val device = all.firstOrNull { it.vendorId == VID && it.productId == PID }
         if (device == null) {
-            setHeader(
-                "STRIDE USB probe — read only\n" +
-                "TARGET NOT FOUND (looking for ${hex4(VID)}:${hex4(PID)})\n" +
-                "saw ${all.size} device(s): " +
-                all.joinToString { "${hex4(it.vendorId)}:${hex4(it.productId)}" }
-            )
-            append("Is com.ifit.eru still holding the device? It must stay disabled.")
+            append("Expected ICON device ${hex4(VID)}:${hex4(PID)} not found.")
             return
         }
 
-        describe(device)
+        append("Inventory only. Reading reports is optional and requires the board idle.")
+        readButton.isEnabled = true
+        readButton.setOnClickListener {
+            readButton.isEnabled = false
+            requestReadPermission(manager, device)
+        }
+    }
 
+    private fun requestReadPermission(manager: UsbManager, device: UsbDevice) {
         if (manager.hasPermission(device)) {
             append("already have permission")
             openAndRead(device)
@@ -172,9 +184,8 @@ class MainActivity : Activity() {
     }
 
     /** Dump the descriptor tree — needed to know which endpoint to talk to later. */
-    private fun describe(device: UsbDevice) {
+    private fun describe(device: UsbDevice): String {
         val sb = StringBuilder()
-        sb.append("STRIDE USB probe — read only\n")
         sb.append("${device.manufacturerName} / ${device.productName}\n")
         sb.append("vid=${hex4(device.vendorId)} pid=${hex4(device.productId)} ")
         sb.append("class=${device.deviceClass} ifaces=${device.interfaceCount}\n")
@@ -191,8 +202,8 @@ class MainActivity : Activity() {
                 sb.append("interval=${ep.interval}\n")
             }
         }
-        setHeader(sb.toString().trimEnd())
         Log.i(TAG, sb.toString())
+        return sb.toString().trimEnd()
     }
 
     private fun openAndRead(device: UsbDevice) {
@@ -223,12 +234,16 @@ class MainActivity : Activity() {
 
         if (chosen == null || inEp == null) {
             append("no IN endpoint found — cannot read")
+            conn.close()
+            connection = null
             return
         }
 
-        // force=true detaches any kernel driver already bound to the interface.
-        if (!conn.claimInterface(chosen, true)) {
+        // Do not detach a controller's existing kernel driver for a diagnostic.
+        if (!conn.claimInterface(chosen, false)) {
             append("claimInterface() FAILED")
+            conn.close()
+            connection = null
             return
         }
         claimedInterface = chosen
