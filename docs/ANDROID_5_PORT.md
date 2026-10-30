@@ -181,7 +181,8 @@ The completed query sequence was 129, 136, 130, 132, 2. All five responses had
 valid lengths/checksums and successful status. Identity reported device address 4,
 software 82, hardware 1, model 14116, part 388129 and master library 82.55.
 The protocol manufacturer field varied across identity replies and is not used
-to identify or authorize the device; the USB VID/PID, model and part are used.
+to identify or authorize the device. USB VID/PID selects it, and the returned
+model/part confirm its identity for this test.
 
 | Status/limit | Board response |
 |---|---:|
@@ -198,7 +199,7 @@ The optional command list includes VerifySecurity; the probe did not invoke it.
 iFit and Arda were temporarily stopped for the bench session and their packages
 and data were retained.
 
-Next validation should isolate identity/capability/status reads from initialization
-writes, then establish limits, safety-key/start behavior and independent feedback
-before connecting the Lab's proposals to physical actuation. This inspection sent
-no board commands and did not launch the STRIDE motor driver.
+Next validation should establish cold-start read access, safety-key/start behavior,
+independent feedback and staged actuation before connecting the Lab's proposals to
+physical motion. Static inspection sent no board commands; the later probe sent
+only the documented read queries and did not launch the STRIDE motor driver.
