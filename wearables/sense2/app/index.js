@@ -4,6 +4,7 @@ import { BodyPresenceSensor } from 'body-presence';
 import { me } from 'appbit';
 import { display } from 'display';
 import * as messaging from 'messaging';
+import { createExerciseTest } from './exercise-test';
 
 console.log('HR_PROBE runtime features: Number.isFinite=' + typeof Number.isFinite);
 // Use primitive checks: the watch runtime may lack modern Number helpers.
@@ -40,8 +41,15 @@ let hrmRequested = false;
 let body = null;
 let phoneUnavailable = false;
 const ui = {};
-['bpm', 'state', 'link', 'count', 'clock', 'raw', 'last', 'runtime', 'wear', 'toggle', 'toggle-label']
+['bpm', 'state', 'link', 'count', 'clock', 'raw', 'last', 'runtime', 'wear', 'exercise', 'exercise-toggle', 'exercise-label', 'toggle', 'toggle-label']
   .forEach(id => ui[id] = document.getElementById(id));
+const exerciseTest = createExerciseTest({
+  now: () => Date.now(),
+  permission: () => me.permissions.granted('access_exercise'),
+  // Deliberately lazy: a missing native module must not break passive HR.
+  load: () => require('exercise'),
+});
+function testInput() { return {onWrist, paused}; }
 function describe(value) {
   if (value === null) return 'null';
   if (value === undefined) return 'undefined';
@@ -59,7 +67,7 @@ function phoneLabel() {
 }
 function render() {
   const now = new Date();
-  ui.clock.text = 'DIAG 0.1.4  ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+  ui.clock.text = 'DIAG 0.1.5  ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
   ui.bpm.text = status === 'ok' ? String(latestBpm) : '--';
   ui.state.text = status.replace(/_/g, ' ');
   ui.link.text = phoneLabel();
@@ -68,7 +76,10 @@ function render() {
   ui.last.text = lastValidAt ? 'last ' + lastValidBpm + ' BPM / ' + Math.max(0, Math.floor((Date.now() - lastValidAt) / 1000)) + 's ago' : 'last valid: none';
   ui.wear.text = 'wear ' + (onWrist === null ? '?' : onWrist ? 'yes' : 'no') + ' / flips ' + wearChanges + ' / starts ' + sensorStarts;
   ui.runtime.text = (display.on ? 'on' : 'off') + ' / wakes ' + wakeCount + ' / ticks ' + ticks + ' / ' + Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) + 's';
-  ui['toggle-label'].text = paused ? 'Resume stream' : 'Pause stream';
+  ui['toggle-label'].text = paused ? 'Resume HR' : 'Pause HR';
+  const test = exerciseTest.snapshot();
+  ui.exercise.text = test.phase === 'active' ? 'TEST ' + test.remainingSec + 's / ' + test.samples + ' reads / gap ' + test.maxGapSec + 's' : test.message;
+  ui['exercise-label'].text = test.owned ? 'Stop test' : test.phase === 'armed' ? 'Confirm recording' : 'Start 60s test';
 }
 function frame() {
   return { kind: 'hr', version: 1, source: 'sense2', sessionId, sequence,
@@ -133,6 +144,7 @@ if (!me.permissions.granted('access_heart_rate') || !me.permissions.granted('acc
     lastValidAt = lastObservedAt;
     sequence++;
     validCount++;
+    exerciseTest.reading();
     status = 'ok';
     publish();
   });
@@ -152,6 +164,7 @@ if (!me.permissions.granted('access_heart_rate') || !me.permissions.granted('acc
       // Immediately reject streaming data. Keep an already-running acquisition
       // steady during this diagnostic so presence flapping cannot starve it.
       // Even raw events while off wrist never become eligible/forwardable HR.
+      exerciseTest.stop('Wear lost');
       invalidate(onWrist === false ? 'off_wrist' : 'waiting_for_wear');
       publish();
     } else if (previous !== true) {
@@ -164,6 +177,7 @@ if (!me.permissions.granted('access_heart_rate') || !me.permissions.granted('acc
     onWrist = null;
     hrm.stop();
     hrmRequested = false;
+    exerciseTest.stop('Wear detection failed');
     invalidate('wear_detection_error');
     publish();
   });
@@ -174,10 +188,21 @@ function toggle() {
   if (!hrm) return;
   paused = !paused;
   me.appTimeoutEnabled = paused;
-  if (paused) { hrm.stop(); hrmRequested = false; invalidate('paused'); }
+  if (paused) { exerciseTest.stop('HR paused'); hrm.stop(); hrmRequested = false; invalidate('paused'); }
   else startSensor();
   publish();
 }
+function testButton() {
+  const test = exerciseTest.snapshot();
+  if (test.owned) exerciseTest.stop('User stopped');
+  else if (test.phase === 'armed') exerciseTest.confirm(testInput());
+  else exerciseTest.arm(testInput());
+  publish();
+}
+ui['exercise-toggle'].addEventListener('click', testButton);
+ui['exercise-label'].addEventListener('click', testButton);
+// Best effort, synchronous cleanup only. A killed runtime cannot guarantee a stop.
+me.onunload = () => exerciseTest.stop('Probe closed');
 ui.toggle.addEventListener('click', toggle);
 ui['toggle-label'].addEventListener('click', toggle);
 display.addEventListener('change', () => {
@@ -196,6 +221,7 @@ try {
 } catch (_) { phoneUnavailable = true; }
 setInterval(() => {
   ticks++;
+  exerciseTest.tick(testInput());
   if (!paused && status === 'ok' && Date.now() - lastObservedAt > 5000) invalidate('stale');
   publish();
 }, 1000);

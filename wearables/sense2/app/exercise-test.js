@@ -1,0 +1,119 @@
+// No Fitbit module loads or activity writes occur until an explicit confirmation.
+// Only timing/counters are retained here; BPM values never enter this controller.
+export function createExerciseTest(options) {
+  let phase = 'idle';
+  let message = '60s test: creates Fitbit activity';
+  let api = null;
+  let owned = false;
+  let armedUntil = 0;
+  let startedAt = 0;
+  let lastClock = 0;
+  let callbacks = 0;
+  let samples = 0;
+  let lastSampleAt = 0;
+  let maxGapMs = 0;
+  function clock() {
+    const value = options.now();
+    if (typeof value !== 'number' || value !== value || value < 0 || value === Infinity) throw Error('Invalid clock');
+    return value;
+  }
+  function changed() { if (options.changed) options.changed(); }
+  function allowed(input) { return input && input.onWrist === true && input.paused === false; }
+  function snapshot() {
+    const elapsed = phase === 'active' ? Math.max(0, lastClock - startedAt) : 0;
+    return {phase, message, owned, samples, maxGapSec: Math.ceil(maxGapMs / 1000),
+      remainingSec: phase === 'active' ? Math.max(0, 60 - Math.floor(elapsed / 1000)) : 0};
+  }
+  function stop(reason) {
+    if (!owned) {
+      if (phase === 'armed') { phase = 'idle'; message = 'Test cancelled; nothing recorded'; changed(); }
+      return snapshot();
+    }
+    try {
+      const state = api.state;
+      if (state === 'started' || state === 'paused') api.stop();
+      if (api.state !== 'stopped') throw Error('Stop not confirmed');
+      if (startedAt) maxGapMs = Math.max(maxGapMs, Math.max(0, clock() - (lastSampleAt || startedAt)));
+      owned = false;
+      phase = 'done';
+      message = (reason || 'Test ended') + ': ' + samples + ' readings, max gap ' + Math.ceil(maxGapMs / 1000) + 's';
+    } catch (_) {
+      phase = 'error';
+      message = 'Stop unconfirmed: end exercise in Fitbit';
+    }
+    changed();
+    return snapshot();
+  }
+  function arm(input) {
+    if (owned) return snapshot();
+    if (!allowed(input)) { phase = 'blocked'; message = 'Wear watch; resume HR before test'; changed(); return snapshot(); }
+    phase = 'armed';
+    armedUntil = clock() + 10000;
+    message = 'Confirm: records 60s Treadmill activity';
+    changed();
+    return snapshot();
+  }
+  function confirm(input) {
+    if (owned) return snapshot();
+    if (phase !== 'armed' || clock() >= armedUntil || !allowed(input)) {
+      phase = 'idle'; message = 'Start cancelled; nothing recorded'; changed(); return snapshot();
+    }
+    try {
+      if (!options.permission()) throw Error('Permission missing');
+    } catch (_) { phase = 'blocked'; message = 'Fitbit exercise permission required'; changed(); return snapshot(); }
+    try {
+      const module = options.load();
+      api = module && (module.default || module.exercise || module);
+      if (!api || typeof api.start !== 'function' || typeof api.stop !== 'function') throw Error('Unsupported exercise API');
+      const existing = api.state;
+      if (existing !== 'stopped') {
+        phase = 'blocked'; message = 'Another Fitbit exercise may be active'; changed(); return snapshot();
+      }
+    } catch (_) {
+      api = null;
+      phase = 'unsupported'; message = 'Exercise API unavailable; HR still works'; changed(); return snapshot();
+    }
+    // The state was verified stopped. Mark ownership before start so a partial
+    // native failure cannot be mistaken for permission to create another session.
+    startedAt = clock(); lastClock = startedAt; callbacks = 0;
+    samples = 0; lastSampleAt = 0; maxGapMs = 0;
+    owned = true;
+    try {
+      api.start('treadmill', {gps:false, autopause:false});
+      if (api.state !== 'started') throw Error('Start not confirmed');
+      phase = 'active'; message = 'Recording test activity';
+    } catch (_) {
+      stop('Start failed');
+      if (!owned) { phase = 'error'; message = 'Exercise start failed; no automatic retry'; }
+    }
+    changed();
+    return snapshot();
+  }
+  function reading() {
+    if (phase !== 'active') return;
+    const time = clock();
+    if (time < lastClock || time < startedAt || time - startedAt >= 60000) { stop('Test complete'); return; }
+    samples++;
+    maxGapMs = Math.max(maxGapMs, time - (lastSampleAt || startedAt));
+    lastSampleAt = time;
+  }
+  function tick(input) {
+    const time = clock();
+    if (phase === 'armed' && (time >= armedUntil || !allowed(input))) {
+      phase = 'idle'; message = 'Start cancelled; nothing recorded'; changed();
+    }
+    if (phase !== 'active') return snapshot();
+    if (!allowed(input)) return stop(input && input.paused ? 'HR paused' : 'Wear lost');
+    if (time < lastClock) return stop('Clock changed');
+    lastClock = time; callbacks++;
+    try {
+      if (api.state === 'stopped') {
+        owned = false; phase = 'done'; message = 'Exercise ended outside this probe'; changed(); return snapshot();
+      }
+      if (api.state !== 'started') return stop('Exercise paused');
+    } catch (_) { return stop('Exercise state unavailable'); }
+    if (time - startedAt >= 60000 || callbacks >= 60) return stop('Test complete');
+    return snapshot();
+  }
+  return {snapshot, arm, confirm, reading, tick, stop};
+}

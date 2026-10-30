@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import fs from 'node:fs';
+import { createExerciseTest } from '../app/exercise-test.js';
 const source=fs.readFileSync(new URL('../app/index.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
-function setup({activity=true,heart=true,bodyAvailable=true,modernNumber=true,brokenPeer=null}={}) {
+function setup({activity=true,heart=true,bodyAvailable=true,modernNumber=true,brokenPeer=null,exercisePermission=true,nativeExercise=null}={}) {
  const ui={},sent=[],timers=[];let heartSensor,bodySensor,now=1_000_000;
  class FakeDate extends Date { constructor(...args){super(...(args.length?args:[now]));}static now(){return now;} }
  class HeartRateSensor {
@@ -17,14 +18,14 @@ function setup({activity=true,heart=true,bodyAvailable=true,modernNumber=true,br
   addEventListener(name,handler){this.events[name]=handler;}
   start(){}
  }
- const me={appTimeoutEnabled:true,permissions:{granted:name=>name==='access_activity'?activity:heart}};
+ const me={appTimeoutEnabled:true,permissions:{granted:name=>name==='access_activity'?activity:name==='access_exercise'?exercisePermission:heart}};
  const display={on:true,events:{},addEventListener(name,handler){this.events[name]=handler;}};
  const peer={OPEN:1,readyState:1,bufferedAmount:0,send:frame=>sent.push(frame),addEventListener(){}};
  if(brokenPeer==='state')Object.defineProperty(peer,'readyState',{get(){throw TypeError('Expected a function');}});
  if(brokenPeer==='bind')peer.addEventListener=()=>{throw TypeError('Expected a function');};
  if(brokenPeer==='send')peer.send=()=>{throw TypeError('Expected a function');};
  const context={document:{getElementById:id=>ui[id]??=({text:'',events:{},addEventListener(name,handler){this.events[name]=handler;}})},HeartRateSensor,
-  BodyPresenceSensor:bodyAvailable?BodyPresenceSensor:undefined,me,display,
+  require(name){if(name!=='exercise'||!nativeExercise)throw Error('Native module unavailable');return nativeExercise;},createExerciseTest,BodyPresenceSensor:bodyAvailable?BodyPresenceSensor:undefined,me,display,
   messaging:{peerSocket:peer},
   setInterval(handler){timers.push(handler);},console:{log(){}},Date:FakeDate,Math,Number:modernNumber?Number:{},String};
  vm.runInNewContext(source,context);
@@ -119,3 +120,26 @@ for(const brokenPeer of ['state','bind','send']) {
   h.tick(6000);assert.equal(h.ui.state.text,'stale');
  });
 }
+
+test('watch test UI never loads/records on boot and requires a second confirmed press',()=>{
+ let starts=0,stops=0;const nativeExercise={state:'stopped',start(){starts++;this.state='started';},stop(){stops++;this.state='stopped';}};
+ const h=setup({nativeExercise});assert.equal(starts,0);h.wear(true);
+ h.ui['exercise-toggle'].events.click();assert.equal(starts,0);assert.equal(h.ui['exercise-label'].text,'Confirm recording');
+ h.ui['exercise-toggle'].events.click();assert.equal(starts,1);assert.equal(h.ui['exercise-label'].text,'Stop test');
+ h.read(120,100);h.tick();assert.match(h.ui.exercise.text,/1 reads/);
+ h.ui.toggle.events.click();assert.equal(stops,1);assert.equal(h.ui.state.text,'paused');
+});
+test('denied or unsupported exercise access leaves passive heart-rate readings functional',()=>{
+ for(const exercisePermission of [false,true]){
+  const h=setup({exercisePermission});h.wear(true);
+  h.ui['exercise-toggle'].events.click();h.ui['exercise-toggle'].events.click();
+  h.read(120,100);h.tick();assert.equal(h.ui.bpm.text,'120');assert.equal(h.ui.state.text,'ok');
+  assert.match(h.ui.exercise.text,exercisePermission?/unavailable/:/permission/);
+ }
+});
+test('watch unload stops its own test without changing the freshness gate',()=>{
+ const nativeExercise={state:'stopped',start(){this.state='started';},stop(){this.state='stopped';}};
+ const h=setup({nativeExercise});h.wear(true);h.ui['exercise-toggle'].events.click();h.ui['exercise-toggle'].events.click();
+ h.read(120,100);h.tick(6000);assert.equal(h.ui.state.text,'stale');
+ h.me.onunload();assert.equal(nativeExercise.state,'stopped');
+});

@@ -1,6 +1,6 @@
 {
   "name": "stride-sense2-probe",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
@@ -11,6 +11,7 @@
     "requestedPermissions": [
       "access_heart_rate",
       "access_activity",
+      "access_exercise",
       "access_internet"
     ],
     "buildTargets": [

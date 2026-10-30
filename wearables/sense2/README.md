@@ -15,7 +15,7 @@ photos; continuous acquisition and watch-to-phone forwarding are not.
 ## Current validation (2026-10-30)
 
 - Watch, companion and settings components build to `build/app.fba`.
-- Twenty-five Node tests cover schema validation, delayed/stale readings, future clocks,
+- Forty-three Node tests cover schema validation, delayed/stale readings, future clocks,
   off-wrist/paused state, duplicate heartbeats, retired sessions, stalled delivery,
   opt-in authenticated forwarding, missing watch permissions, missing wear
   detection, failure of wear detection while streaming, and repeated presence
@@ -155,6 +155,44 @@ requires an explicit user start and the exercise permission.
 
 The display still reports the phone disconnected. SDK OAuth/Gallery installation
 blocks for the companion remain; watch-local BPM is not a verified phone stream.
+
+## Integrated exercise test 0.1.5 (prepared, not installed)
+
+The user confirmed that the probe could be revisited only after ending the native
+Fitbit workout. The completed-workout photo therefore does not establish HR
+cadence during exercise. A separate native exercise screen cannot currently supply
+a concurrent comparison for this probe.
+
+Revision 0.1.5 adds an optional exercise session inside the probe using
+`access_exercise`. This is a new permission to create Fitbit Activity Log records;
+installation is pending explicit user approval. Nothing starts at app launch.
+The native exercise module is loaded lazily only after an on-watch Start and
+Confirm sequence while wear is confirmed and HR is unpaused. The confirmation
+states that it records a 60-second Treadmill test. GPS and autopause are disabled.
+No native exercise API, permission grant or faster cadence has been verified on
+the Sense 2 yet. Unsupported modules/permissions leave passive HR usable.
+
+An owned test stops after 60 seconds when its timer runs, on explicit Stop, on HR
+pause/wear loss, or on native pause. Unload cleanup is best effort and synchronous;
+a killed/suspended runtime cannot guarantee a timely stop. If stop cannot be
+confirmed, the probe retains ownership, blocks replacement starts and instructs
+the user to end the exercise in Fitbit. It never stops an exercise already active
+before the test and never automatically resumes an exercise. Starting an exercise
+may sync its activity record to the paired Fitbit account.
+
+The test displays remaining time, eligible unique HR-reading count and maximum
+inter-reading/start/end gap. It retains timing/counters only; biometric values
+are not added to diagnostic logs. The existing five-second freshness limit and
+the phone receiver's start/resume gates remain unchanged. This is a capability
+and cadence test, not an actuation test or a guarantee of continuous data.
+
+All 43 tests and the FBA build pass, including explicit confirmation/expiry,
+permission gating, foreign-workout protection, native failures, clock changes,
+auto-stop, repeated actions, local HR surviving unsupported APIs, and unload.
+The generated watch script keeps `require("exercise")` inside a lazy function.
+A separate exercise-test artifact is prepared; the previous passive FBA is
+preserved outside the repo for rollback. No exercise was started by these tests
+on the physical watch; unit tests use a fake native exercise object.
 
 ## Repeat the local USB watch test
 

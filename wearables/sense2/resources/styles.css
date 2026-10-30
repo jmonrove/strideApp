@@ -11,3 +11,6 @@ text { fill: #d8eaf0; font-family: System-Regular; text-anchor: middle; text-len
 #runtime { fill: #9bb5c1; font-size: 15; }
 #link { font-size: 14; }
 #toggle-label { fill: white; font-size: 16; }
+#exercise { fill: #e9c27b; font-size: 13; }
+#exercise-label { fill: white; font-size: 14; }
+#toggle-label { font-size: 14; }

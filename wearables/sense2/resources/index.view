@@ -1,14 +1,17 @@
 <svg class="background">
-  <text id="title" x="50%" y="30">STRIDE HR PROBE</text>
-  <text id="clock" x="50%" y="54">DIAG 0.1.4</text>
-  <text id="bpm" x="50%" y="126">--</text>
-  <text id="state" x="50%" y="151">Waiting for sensor</text>
-  <text id="raw" x="50%" y="177">raw HR null / TS null</text>
-  <text id="last" x="50%" y="199">last valid: none</text>
-  <text id="wear" x="50%" y="221">wear ? / flips 0 / starts 0</text>
-  <text id="count" x="50%" y="243">0 events / 0 unique / 0 valid</text>
-  <text id="runtime" x="50%" y="265">screen on / ticks 0 / 0s</text>
-  <text id="link" x="50%" y="285">Phone disconnected</text>
-  <rect id="toggle" x="50%-80" y="292" width="160" height="33" rx="10" fill="#163a48" />
-  <text id="toggle-label" x="50%" y="315">Pause stream</text>
+  <text id="title" x="50%" y="25">STRIDE HR PROBE</text>
+  <text id="clock" x="50%" y="46">DIAG 0.1.5</text>
+  <text id="bpm" x="50%" y="111">--</text>
+  <text id="state" x="50%" y="136">Waiting for sensor</text>
+  <text id="raw" x="50%" y="157">raw HR null / TS null</text>
+  <text id="last" x="50%" y="177">last valid: none</text>
+  <text id="wear" x="50%" y="197">wear ? / flips 0 / starts 0</text>
+  <text id="count" x="50%" y="217">0 events / 0 unique / 0 valid</text>
+  <text id="runtime" x="50%" y="237">screen on / ticks 0 / 0s</text>
+  <text id="link" x="50%" y="255">Phone disconnected</text>
+  <text id="exercise" x="50%" y="275">60s test: creates Fitbit activity</text>
+  <rect id="toggle" x="15" y="285" width="145" height="41" rx="10" fill="#163a48" />
+  <text id="toggle-label" x="87" y="312">Pause HR</text>
+  <rect id="exercise-toggle" x="171" y="285" width="150" height="41" rx="10" fill="#245e54" />
+  <text id="exercise-label" x="246" y="312">Start 60s test</text>
 </svg>
