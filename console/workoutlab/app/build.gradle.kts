@@ -5,12 +5,16 @@ plugins {
 android {
     namespace = "dev.stride.lab"
     compileSdk = 34
+    useLibrary("android.test.runner", false)
+    useLibrary("android.test.base", false)
+    useLibrary("android.test.mock", false)
     defaultConfig {
         applicationId = "dev.stride.lab"
         minSdk = 22
         targetSdk = 28
-        versionCode = 1
-        versionName = "0.1-preview"
+        testInstrumentationRunner = "android.test.InstrumentationTestRunner"
+        versionCode = 2
+        versionName = "0.2.0-console-preview"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

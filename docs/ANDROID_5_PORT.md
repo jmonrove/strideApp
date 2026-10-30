@@ -203,3 +203,23 @@ Next validation should establish cold-start read access, safety-key/start behavi
 independent feedback and staged actuation before connecting the Lab's proposals to
 physical motion. Static inspection sent no board commands; the later probe sent
 only the documented read queries and did not launch the STRIDE motor driver.
+
+
+## Console interface APK (2026-10-30)
+
+The separate `console/workoutlab` app is now STRIDE Preview
+`0.2.0-console-preview` (version code 2, package `dev.stride.lab`, minimum API 22).
+It implements the approved Home/setup/live/sensors/history/settings screens,
+manual-only sessions, the original-style 400 m oval, an incline profile, and a
+recorded HR chart. The original full STRIDE motor package remains uninstalled.
+
+The interface runs from bundled APK assets inside the console's WebView 83. The
+implementation uses explicit positional properties and flex spacing compatible
+with that WebView. Native code owns the workout clock, validated actions, limits,
+source freshness, summaries and saved settings. Telemetry updates preserve mounted
+controls rather than replacing Stop or the preflight buttons during touch input.
+The WebView rejects external navigation/requests and has no file/content access.
+
+This app still has no USB/motor adapter or fan commands. Displayed pace, grade and
+distance are simulated; the selected sensor source is labeled explicitly. The
+physical controller's motion/safety/feedback checks above remain outstanding.

@@ -59,4 +59,28 @@ class PreviewServerTest {
             assertEquals(409, post("/action", "{\"action\":\"resume\"}").first)
         } finally { server.close(); session.close() }
     }
+    @Test fun authenticatedManualAndSettingsActionsUseTheSharedNativeCommandRules() {
+        val session = LabSession(monotonicNow = { 0L }, startClock = false)
+        val server = PreviewServer(session, "preview", 0)
+        server.start()
+        fun post(body: String) = request(server.boundPort, "/action", session.token, body)
+        try {
+            assertEquals(200, post("""{"action":"configure","maxSpeedMph":1.5,"maxInclinePercent":2,"adaptiveSpeed":false}""").first)
+            assertEquals(400, post("""{"action":"startManual","minutes":1.5}""").first)
+            val started = post("""{"action":"startManual","minutes":10}""")
+            assertEquals(200, started.first)
+            val state = JSONObject(started.second)
+            assertEquals("MANUAL", state.getString("state"))
+            assertTrue(state.getBoolean("manualSession"))
+            assertFalse(state.getBoolean("motorConnected"))
+            assertEquals(1.5, state.getDouble("targetSpeedMph"), .00001)
+            assertEquals(409, post("""{"action":"configure","maxSpeedMph":2,"maxInclinePercent":2,"adaptiveSpeed":true}""").first)
+            assertEquals(200, post("""{"action":"pause"}""").first)
+            assertEquals(409, post("""{"action":"resume"}""").first)
+            assertEquals(200, post("""{"action":"resumeManual"}""").first)
+            assertEquals(200, post("""{"action":"stop"}""").first)
+            assertEquals(409, post("""{"action":"resumeManual"}""").first)
+        } finally { server.close(); session.close() }
+    }
+
 }

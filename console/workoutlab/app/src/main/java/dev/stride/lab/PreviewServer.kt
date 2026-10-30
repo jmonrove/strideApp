@@ -61,7 +61,8 @@ class PreviewServer(private val session: LabSession, private val page: String, v
                 request.method == "GET" && request.path == "/routines" -> reply(socket, 200, session.routines().toString())
                 request.method == "POST" && request.path == "/action" -> {
                     require(request.headers["content-type"]?.substringBefore(';') == "application/json") { "JSON required" }
-                    action(JSONObject(request.body))
+                    check(running) { "Preview server stopped" }
+                    session.action(JSONObject(request.body))
                     reply(socket, 200, session.status().toString())
                 }
                 request.method == "POST" && request.path == "/api/hr" -> {
@@ -91,25 +92,6 @@ class PreviewServer(private val session: LabSession, private val page: String, v
         }
     }
 
-    private fun action(body: JSONObject) {
-        check(running) { "Preview server stopped" }
-        val now = session.now()
-        when (body.getString("action")) {
-            "start" -> session.engine.start(body.getString("routine"), integer(body, "minutes", 1, 120).toInt(), now)
-            "pause" -> session.engine.pause()
-            "stop" -> session.engine.stop()
-            "resume" -> session.engine.resume(now)
-            "manual" -> session.engine.manual(number(body, "speedMph"), number(body, "inclinePercent"))
-            "sensor" -> session.selectSensor(WorkoutEngine.Sensor.valueOf(body.getString("source")))
-            "simulate" -> session.setSimulatedBpm(integer(body, "bpm", 30, 240).toInt())
-            else -> throw IllegalArgumentException("Unknown action")
-        }
-    }
-
-    private fun number(body: JSONObject, key: String): Double {
-        require(body.get(key) is Number) { "$key must be a number" }
-        return body.getDouble(key).also { require(it.isFinite()) { "$key must be finite" } }
-    }
     private fun integer(body: JSONObject, key: String, low: Long, high: Long): Long {
         val value = body.get(key)
         require(value is Int || value is Long) { "$key must be an integer" }

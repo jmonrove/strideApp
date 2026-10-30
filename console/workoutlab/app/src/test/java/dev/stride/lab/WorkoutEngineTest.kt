@@ -120,4 +120,183 @@ class WorkoutEngineTest {
         try { e.tick(4_999); fail() } catch (_: IllegalArgumentException) { }
         assertEquals(WorkoutEngine.State.RUNNING, e.snapshot(5_000).state)
     }
+    @Test fun manualSessionStartsAndResumesWithoutInventingSensorReadings() {
+        val e = WorkoutEngine()
+        e.selectSensor(WorkoutEngine.Sensor.PHONE)
+        e.startManual(10, 0)
+        val initial = e.snapshot(0)
+        assertTrue(initial.manualSession)
+        assertNull(initial.routineId)
+        assertNull(initial.bpm)
+        assertFalse(initial.sensorFresh)
+        assertEquals(2.0, initial.targetSpeedMph, .0001)
+        assertEquals(WorkoutEngine.State.MANUAL, e.tick(1_000).state)
+        e.pause()
+        assertTrue(e.snapshot(1_000).canResumeManual)
+        try { e.resume(1_000); fail() } catch (_: IllegalStateException) { }
+        e.resumeManual(20_000)
+        val after = e.tick(21_000)
+        assertEquals(WorkoutEngine.State.MANUAL, after.state)
+        assertEquals(2.0, after.elapsedSec, .0001)
+        assertFalse(after.sensorFresh)
+        e.stop()
+        try { e.resumeManual(22_000); fail() } catch (_: IllegalStateException) { }
+    }
+    @Test fun pausedGuidedManualOverrideCanResumeManuallyWithStaleHr() {
+        val e = WorkoutEngine()
+        warm(e); e.start("steady", 20, 4_000)
+        e.manual(1.5, 2.0); e.tick(5_000); e.pause()
+        assertTrue(e.snapshot(20_000).canResumeManual)
+        try { e.resume(20_000); fail() } catch (_: IllegalStateException) { }
+        e.resumeManual(20_000)
+        assertEquals(WorkoutEngine.State.MANUAL, e.tick(21_000).state)
+        assertEquals(1.5, e.snapshot(21_000).targetSpeedMph, .0001)
+    }
+    @Test fun changingSettingsDuringAnyActiveSessionIsRejected() {
+        val e = WorkoutEngine()
+        e.reconfigure(e.config.copy(maxSpeedMph = 2.2, maxIncline = 1.0))
+        e.startManual(1, 0)
+        for (pause in listOf(false, true)) {
+            if (pause) e.pause()
+            try { e.reconfigure(e.config.copy(maxSpeedMph = 3.0)); fail() }
+            catch (_: IllegalStateException) { }
+            assertEquals(2.2, e.config.maxSpeedMph, .0001)
+        }
+        e.stop()
+        e.reconfigure(e.config.copy(maxSpeedMph = 3.0))
+        assertEquals(0.0, e.snapshot(0).speedMph, .0001)
+        assertEquals(0.0, e.snapshot(0).incline, .0001)
+        assertEquals(WorkoutEngine.State.STOPPED, e.snapshot(0).state)
+    }
+    @Test fun distanceUsesRampedProposalAndDoesNotCatchUpPausedOrMissingClockTime() {
+        val e = WorkoutEngine()
+        e.startManual(10, 0)
+        for (i in 1..20) e.tick(i * 1_000L)
+        val before = e.snapshot(20_000)
+        assertEquals(1.0, before.speedMph, .00001)
+        assertEquals(10.0 / 3600.0, before.distanceMiles, .000001)
+        val gap = e.tick(100_000)
+        assertEquals(WorkoutEngine.State.PAUSED, gap.state)
+        assertEquals(before.distanceMiles, gap.distanceMiles, .000001)
+        assertEquals(before.elapsedSec, gap.elapsedSec, .000001)
+        e.resumeManual(101_000); e.tick(102_000)
+        assertEquals(before.distanceMiles + .025 / 3600.0, e.snapshot(102_000).distanceMiles, .000001)
+        e.stop(); e.tick(103_000)
+        val firstSessionId = e.snapshot(103_000).sessionId
+        e.startManual(10, 104_000)
+        assertEquals(0.0, e.snapshot(104_000).distanceMiles, .000001)
+        assertTrue(e.snapshot(104_000).sessionId > firstSessionId)
+    }
+    @Test fun heartRateSummaryIsBoundedAndNeverMixesPhoneAndSyntheticSources() {
+        val e = WorkoutEngine()
+        e.startManual(10, 0)
+        for (i in 1..300) {
+            e.acceptHeartRate(if (i == 150) 160 else 120, i * 1_000L, i.toLong(), WorkoutEngine.Sensor.SIMULATED)
+            e.tick(i * 1_000L)
+        }
+        val before = e.snapshot(300_000)
+        assertTrue(before.hrSamples.size in 1..120)
+        assertEquals(160, before.peakHeartRateBpm)
+        assertEquals(120.0 + 40.0 / 300, before.averageHeartRateBpm!!, .000001)
+        assertTrue(before.hrSamples.all { it.source == WorkoutEngine.Sensor.SIMULATED })
+        e.selectSensor(WorkoutEngine.Sensor.PHONE)
+        assertNull(e.snapshot(300_000).averageHeartRateBpm)
+        assertTrue(e.snapshot(300_000).hrSamples.isEmpty())
+        e.acceptHeartRate(140, 301_000, 1, WorkoutEngine.Sensor.PHONE)
+        e.acceptHeartRate(200, 301_100, 2, WorkoutEngine.Sensor.PHONE)
+        assertEquals(140.0, e.snapshot(301_100).averageHeartRateBpm!!, .000001)
+        assertEquals(1, e.snapshot(301_100).hrSamples.size)
+        e.resetSensorHistory()
+        assertNull(e.snapshot(301_100).peakHeartRateBpm)
+        assertTrue(e.snapshot(301_100).hrSamples.isEmpty())
+    }
+
+    @Test fun sessionSummaryExcludesReadingsBeforeStartWhilePausedAndAfterStop() {
+        val e = WorkoutEngine()
+        warm(e)
+        assertTrue(e.snapshot(4_000).hrSamples.isEmpty())
+        e.start("steady", 10, 4_000)
+        e.acceptHeartRate(121, 5_000, 5, WorkoutEngine.Sensor.SIMULATED)
+        e.tick(5_000)
+        e.pause()
+        e.acceptHeartRate(200, 6_000, 6, WorkoutEngine.Sensor.SIMULATED)
+        assertEquals(121.0, e.snapshot(6_000).averageHeartRateBpm!!, .000001)
+        e.stop()
+        e.acceptHeartRate(220, 7_000, 7, WorkoutEngine.Sensor.SIMULATED)
+        assertEquals(121, e.snapshot(7_000).peakHeartRateBpm)
+        assertEquals(1, e.snapshot(7_000).hrSamples.size)
+        e.startManual(10, 8_000)
+        assertNull(e.snapshot(8_000).averageHeartRateBpm)
+        assertTrue(e.snapshot(8_000).hrSamples.isEmpty())
+    }
+
+    @Test fun downsampledContinuousHeartRateKeepsOneConnectedSegment() {
+        val e = WorkoutEngine()
+        e.startManual(120, 0)
+        for (i in 1..1_800) {
+            e.acceptHeartRate(120 + i % 4, i * 1_000L, i.toLong(), WorkoutEngine.Sensor.SIMULATED)
+            e.tick(i * 1_000L)
+        }
+        val points = e.snapshot(1_800_000).hrSamples
+        assertTrue(points.size in 2..120)
+        assertEquals(setOf(0), points.map { it.segmentId }.toSet())
+        assertTrue(points.zipWithNext().any { (a, b) -> b.elapsedSec - a.elapsedSec > 5 })
+        assertTrue(points.zipWithNext().all { (a, b) -> a.segmentId == b.segmentId })
+    }
+    @Test fun pauseAndResumeCreateAGraphBreakEvenThoughWorkoutElapsedTimeWasFrozen() {
+        val e = WorkoutEngine()
+        e.startManual(10, 0)
+        for (i in 1..5) {
+            e.acceptHeartRate(120, i * 1_000L, i.toLong(), WorkoutEngine.Sensor.SIMULATED)
+            e.tick(i * 1_000L)
+        }
+        val before = e.snapshot(5_000).hrSamples.last()
+        e.pause()
+        e.acceptHeartRate(125, 20_000, 20, WorkoutEngine.Sensor.SIMULATED)
+        e.resumeManual(20_000)
+        e.acceptHeartRate(124, 21_000, 21, WorkoutEngine.Sensor.SIMULATED)
+        e.tick(21_000)
+        val points = e.snapshot(21_000).hrSamples
+        assertEquals(before.elapsedSec + 1.0, points.last().elapsedSec, .000001)
+        assertTrue(points.last().segmentId > before.segmentId)
+        e.acceptHeartRate(123, 22_000, 22, WorkoutEngine.Sensor.SIMULATED)
+        assertEquals(points.last().segmentId, e.snapshot(22_000).hrSamples.last().segmentId)
+    }
+    @Test fun offWristInvalidStaleAndMissingReadingsBreakTheGraphWithoutSplittingFreshContinuity() {
+        val e = WorkoutEngine()
+        e.startManual(10, 0)
+        fun reading(at: Long, sequence: Long = at / 1_000, age: Long = 0, present: Boolean = true) {
+            e.acceptHeartRate(120, at, sequence, WorkoutEngine.Sensor.SIMULATED, ageMs = age, bodyPresent = present)
+            e.tick(at)
+        }
+        reading(1_000); reading(2_000)
+        assertEquals(0, e.snapshot(2_000).hrSamples.last().segmentId)
+        reading(3_000, present = false); reading(4_000)
+        val offWristSegment = e.snapshot(4_000).hrSamples.last().segmentId
+        assertTrue(offWristSegment > 0)
+        reading(5_000, age = 6_000); reading(6_000)
+        val staleSegment = e.snapshot(6_000).hrSamples.last().segmentId
+        assertTrue(staleSegment > offWristSegment)
+        for (i in 7..12) e.tick(i * 1_000L)
+        reading(13_000)
+        val missingSegment = e.snapshot(13_000).hrSamples.last().segmentId
+        assertTrue(missingSegment > staleSegment)
+        reading(14_000)
+        assertEquals(missingSegment, e.snapshot(14_000).hrSamples.last().segmentId)
+    }
+    @Test fun controllerHeartbeatGapCreatesANewHistorySegmentAndNewSummaryRestoresSegmentZero() {
+        val e = WorkoutEngine()
+        e.startManual(10, 0)
+        e.acceptHeartRate(120, 1_000, 1, WorkoutEngine.Sensor.SIMULATED); e.tick(1_000)
+        val firstSegment = e.snapshot(1_000).hrSamples.last().segmentId
+        e.tick(20_000)
+        assertEquals(WorkoutEngine.State.PAUSED, e.snapshot(20_000).state)
+        e.resumeManual(20_000)
+        e.acceptHeartRate(121, 21_000, 21, WorkoutEngine.Sensor.SIMULATED); e.tick(21_000)
+        assertTrue(e.snapshot(21_000).hrSamples.last().segmentId > firstSegment)
+        e.stop(); e.startManual(10, 22_000)
+        e.acceptHeartRate(122, 23_000, 23, WorkoutEngine.Sensor.SIMULATED)
+        assertEquals(0, e.snapshot(23_000).hrSamples.single().segmentId)
+    }
+
 }

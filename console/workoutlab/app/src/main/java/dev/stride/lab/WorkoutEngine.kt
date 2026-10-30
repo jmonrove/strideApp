@@ -5,7 +5,9 @@ import kotlin.math.max
 import kotlin.math.min
 
 /** Proposed setpoints only. This package has no USB or motor-command implementation. */
-class WorkoutEngine(val config: Config = Config()) {
+class WorkoutEngine(config: Config = Config()) {
+    @Volatile var config: Config = config
+        private set
     data class Config(
         val baseSpeedMph: Double = 2.0,
         val minSpeedMph: Double = 0.8,
@@ -44,7 +46,12 @@ class WorkoutEngine(val config: Config = Config()) {
         val durationSec: Double, val speedMph: Double, val incline: Double,
         val bpm: Double?, val sensorFresh: Boolean, val sensor: Sensor, val reason: String,
         val adaptiveSpeed: Boolean,
+        val targetSpeedMph: Double, val targetIncline: Double, val manualSession: Boolean,
+        val canResumeManual: Boolean, val distanceMiles: Double, val sessionId: Long,
+        val heartRateSourceSequence: Long?, val heartRateMeasuredAtMs: Long?,
+        val hrSamples: List<HistoryReading>, val averageHeartRateBpm: Double?, val peakHeartRateBpm: Int?,
     )
+    data class HistoryReading(val elapsedSec: Double, val bpm: Int, val source: Sensor, val segmentId: Int = 0)
 
     companion object {
         // These are demonstration profiles, not prescribed heart-rate targets or workouts.
@@ -88,10 +95,46 @@ class WorkoutEngine(val config: Config = Config()) {
     private var manualGrade = 0.0
     private var sensorInvalid = false
     private var reason = "Preview only — no treadmill connection"
+    private var manualSession = false
+    private var pausedManual = false
+    private var distanceMiles = 0.0
+    private var sessionId = 0L
+    private var lastHistoryAt: Long? = null
+    private var heartRateTotal = 0L
+    private var heartRateCount = 0L
+    private var heartRatePeak: Int? = null
+    private val hrSamples = mutableListOf<HistoryReading>()
+    private var historySpacingSec = 1.0
+    private var historySegmentId = 0
+    private var historyNeedsSegment = false
+
+    /** Runtime limits change only outside a session; no previous workload is resumed. */
+    @Synchronized fun reconfigure(next: Config) {
+        check(state in setOf(State.IDLE, State.STOPPED, State.COMPLETE)) { "Stop the session before changing limits" }
+        config = next
+        speed = 0.0
+        grade = 0.0
+        manualSpeed = 0.0
+        manualGrade = 0.0
+        bias = 0.0
+        reason = "Preview settings updated; explicit start required"
+    }
+
+    private fun clearHeartRateSummary() {
+        lastHistoryAt = null
+        heartRateTotal = 0L
+        heartRateCount = 0L
+        heartRatePeak = null
+        hrSamples.clear()
+        historySpacingSec = 1.0
+        historySegmentId = 0
+        historyNeedsSegment = false
+    }
 
     @Synchronized fun selectSensor(sensor: Sensor) {
         if (sensor == selectedSensor) return
         selectedSensor = sensor
+        clearHeartRateSummary()
         readings.clear()
         latestSequence = -1
         sensorInvalid = false
@@ -100,6 +143,7 @@ class WorkoutEngine(val config: Config = Config()) {
     }
 
     @Synchronized fun resetSensorHistory() {
+        clearHeartRateSummary()
         readings.clear()
         latestSequence = -1L
         sensorInvalid = false
@@ -119,6 +163,7 @@ class WorkoutEngine(val config: Config = Config()) {
         if (!bodyPresent || bpm !in 30..240 || measuredAt < 0 || ageMs > config.freshForMs) {
             readings.clear()
             sensorInvalid = true
+            historyNeedsSegment = true
             reason = "Heart-rate reading invalid, stale, or off wrist"
             return false
         }
@@ -126,6 +171,28 @@ class WorkoutEngine(val config: Config = Config()) {
         readings.addLast(Reading(bpm, measuredAt))
         while (readings.size > 10) readings.removeFirst()
         sensorInvalid = false
+        if (state in setOf(State.RUNNING, State.MANUAL) &&
+            (lastHistoryAt == null || measuredAt - lastHistoryAt!! >= 1_000)) {
+            if (lastHistoryAt?.let { measuredAt - it > config.freshForMs } == true) historyNeedsSegment = true
+            if (historyNeedsSegment) {
+                if (hrSamples.isNotEmpty()) historySegmentId++
+                historyNeedsSegment = false
+            }
+            lastHistoryAt = measuredAt
+            heartRateTotal += bpm
+            heartRateCount++
+            heartRatePeak = max(heartRatePeak ?: bpm, bpm)
+            if (hrSamples.isEmpty() || hrSamples.last().segmentId != historySegmentId ||
+                elapsedSec - hrSamples.last().elapsedSec >= historySpacingSec) {
+                hrSamples.add(HistoryReading(elapsedSec, bpm, source, historySegmentId))
+                if (hrSamples.size > 120) {
+                    val reduced = hrSamples.filterIndexed { i, _ -> i % 2 == 0 || i == hrSamples.lastIndex }
+                    hrSamples.clear()
+                    hrSamples.addAll(reduced)
+                    historySpacingSec *= 2.0
+                }
+            }
+        }
         return true
     }
 
@@ -135,7 +202,22 @@ class WorkoutEngine(val config: Config = Config()) {
         val selected = ROUTINES.firstOrNull { it.id == routineId }
             ?: throw IllegalArgumentException("Unknown routine")
         check(fresh(now)) { "Wait for five fresh readings spanning four seconds" }
+        begin(selected, minutes, now, false)
+    }
+
+    @Synchronized fun startManual(minutes: Int, now: Long) {
+        require(now >= 0 && minutes in 1..120)
+        check(state in setOf(State.IDLE, State.STOPPED, State.COMPLETE)) { "Stop the current preview before starting another" }
+        begin(null, minutes, now, true)
+    }
+
+    private fun begin(selected: Routine?, minutes: Int, now: Long, manual: Boolean) {
         routine = selected
+        manualSession = manual
+        pausedManual = false
+        sessionId++
+        distanceMiles = 0.0
+        clearHeartRateSummary()
         durationSec = minutes * 60.0
         elapsedSec = 0.0
         speed = 0.0
@@ -145,12 +227,16 @@ class WorkoutEngine(val config: Config = Config()) {
         lastTick = now
         lastDecision = now
         lastLoadChange = now
-        state = State.RUNNING
-        reason = "Preview running"
+        manualSpeed = config.baseSpeedMph
+        manualGrade = 0.0
+        state = if (manual) State.MANUAL else State.RUNNING
+        reason = if (manual) "Manual preview running; heart rate is display-only" else "Preview running"
     }
 
     @Synchronized fun pause() {
         if (state in setOf(State.RUNNING, State.MANUAL, State.SENSOR_HOLD)) {
+            historyNeedsSegment = true
+            pausedManual = state == State.MANUAL
             state = State.PAUSED
             speed = 0.0
             reason = "Paused; resume must be explicit"
@@ -161,6 +247,7 @@ class WorkoutEngine(val config: Config = Config()) {
         state = State.STOPPED
         speed = 0.0
         bias = 0.0
+        pausedManual = false
         reason = "Stopped; no automatic restart"
     }
 
@@ -177,13 +264,24 @@ class WorkoutEngine(val config: Config = Config()) {
     @Synchronized fun resume(now: Long) {
         require(now >= 0)
         check(state in setOf(State.PAUSED, State.MANUAL, State.SENSOR_HOLD)) { "No paused automation to resume" }
+        check(!manualSession) { "This is a manual session; use Resume manual" }
         check(fresh(now)) { "Fresh heart-rate history is required to resume" }
+        historyNeedsSegment = true
         state = State.RUNNING
         bias = 0.0
         lastTick = now
         lastDecision = now
         lastLoadChange = now
         reason = "Automatic preview resumed"
+    }
+
+    @Synchronized fun resumeManual(now: Long) {
+        require(now >= 0)
+        check(state == State.PAUSED && pausedManual) { "No paused manual control to resume" }
+        historyNeedsSegment = true
+        state = State.MANUAL
+        lastTick = now
+        reason = "Manual preview resumed explicitly; automatic changes remain disabled"
     }
 
     @Synchronized fun tick(now: Long): View {
@@ -193,6 +291,7 @@ class WorkoutEngine(val config: Config = Config()) {
         lastTick = now
         val gap = if (previous == null) 0L else now - previous
         if (state == State.RUNNING && (!fresh(now) || gap > MAX_CLOCK_GAP_MS)) {
+            historyNeedsSegment = true
             state = State.SENSOR_HOLD
             reason = if (gap > MAX_CLOCK_GAP_MS) "Controller heartbeat lost; explicit resume required"
                 else "Heart-rate signal lost; workload held, explicit resume required"
@@ -200,21 +299,26 @@ class WorkoutEngine(val config: Config = Config()) {
         if (state == State.RUNNING || state == State.MANUAL) {
             // Never catch up a suspended process by advancing a whole routine or jumping setpoints.
             if (gap > MAX_CLOCK_GAP_MS) {
+                historyNeedsSegment = true
+                pausedManual = state == State.MANUAL
                 state = State.PAUSED
                 speed = 0.0
                 reason = "Controller heartbeat lost; explicit resume required"
                 return view(now)
             }
-            val dt = min(gap / 1000.0, 2.0)
+            val dt = min(min(gap / 1000.0, 2.0), durationSec - elapsedSec)
+            val previousSpeed = speed
             elapsedSec = min(durationSec, elapsedSec + dt)
             if (elapsedSec >= durationSec) {
+                distanceMiles += previousSpeed * dt / 3600.0
                 state = State.COMPLETE
                 speed = 0.0
+                pausedManual = false
                 reason = "Preview complete; no automatic restart"
                 return view(now)
             }
             val phase = phase()
-            val index = routine!!.phases.indexOf(phase)
+            val index = routine?.phases?.indexOf(phase) ?: 0
             if (index != phaseIndex) {
                 phaseIndex = index
                 bias = 0.0
@@ -237,12 +341,11 @@ class WorkoutEngine(val config: Config = Config()) {
                         else "Sustained above-band reading: small proposed decrease"
                 } else reason = "Holding workload"
             }
-            val targetSpeed = if (state == State.MANUAL) manualSpeed else
-                clampSpeed(config.baseSpeedMph * phase.speedFactor + if (config.adaptiveSpeed) bias * .5 else 0.0)
-            val targetGrade = if (state == State.MANUAL) manualGrade else
-                (phase.grade + bias * 2).coerceIn(config.minIncline, config.maxIncline)
+            val targetSpeed = targetSpeed()
+            val targetGrade = targetGrade()
             speed = approach(speed, targetSpeed, config.speedRateMphPerSec * dt)
             grade = approach(grade, targetGrade, config.inclineRatePercentPerSec * dt)
+            distanceMiles += (previousSpeed + speed) * .5 * dt / 3600.0
         }
         return view(now)
     }
@@ -250,6 +353,7 @@ class WorkoutEngine(val config: Config = Config()) {
     @Synchronized fun snapshot(now: Long): View = view(now)
 
     private fun phase(): Phase {
+        if (manualSession) return Phase("Your pace", 1.0, 1.0, 0.0)
         val selected = routine ?: return Phase("Not started", 1.0, 0.0, 0.0)
         return selected.phases.firstOrNull { elapsedSec / durationSec < it.endFraction } ?: selected.phases.last()
     }
@@ -261,8 +365,22 @@ class WorkoutEngine(val config: Config = Config()) {
             readings.last().measuredAt - readings.first().measuredAt >= MIN_HISTORY_MS &&
             now - readings.first().measuredAt <= 15_000
     }
+    private fun targetSpeed(): Double = when (state) {
+        State.RUNNING -> clampSpeed(config.baseSpeedMph * phase().speedFactor + if (config.adaptiveSpeed) bias * .5 else 0.0)
+        State.MANUAL -> manualSpeed
+        State.SENSOR_HOLD -> speed
+        else -> 0.0
+    }
+    private fun targetGrade(): Double = when (state) {
+        State.RUNNING -> (phase().grade + bias * 2).coerceIn(config.minIncline, config.maxIncline)
+        State.MANUAL -> manualGrade
+        else -> grade
+    }
     private fun view(now: Long) = View(state, routine?.id, phase().label, elapsedSec, durationSec,
-        speed, grade, mean(), fresh(now), selectedSensor, reason, config.adaptiveSpeed)
+        speed, grade, mean(), fresh(now), selectedSensor, reason, config.adaptiveSpeed,
+        targetSpeed(), targetGrade(), manualSession, state == State.PAUSED && pausedManual,
+        distanceMiles, sessionId, latestSequence.takeIf { it >= 0 }, readings.lastOrNull()?.measuredAt,
+        hrSamples.toList(), if (heartRateCount > 0) heartRateTotal.toDouble() / heartRateCount else null, heartRatePeak)
     private fun clampSpeed(value: Double) = if (value <= 0.0) 0.0 else value.coerceIn(config.minSpeedMph, config.maxSpeedMph)
     private fun approach(from: Double, target: Double, maximum: Double) = when {
         abs(target - from) <= maximum -> target
