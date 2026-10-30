@@ -14,7 +14,7 @@ sensor API. No live watch reading has been verified yet.
 ## Current validation (2026-10-30)
 
 - Watch, companion and settings components build to `build/app.fba`.
-- Twenty-one Node tests cover schema validation, delayed/stale readings, future clocks,
+- Twenty-five Node tests cover schema validation, delayed/stale readings, future clocks,
   off-wrist/paused state, duplicate heartbeats, retired sessions, stalled delivery,
   opt-in authenticated forwarding, missing watch permissions, missing wear
   detection, failure of wear detection while streaming, and repeated presence
@@ -76,7 +76,7 @@ sensor API. No live watch reading has been verified yet.
   and launch succeeded. The cause of that intermittent installation failure is
   unresolved; no automatic retry loop is used.
 
-## Diagnostic revision 0.1.2
+## Diagnostic revisions 0.1.2–0.1.4
 
 The second wrist test still showed `waiting` / `--`: 13 counted readings in
 roughly two minutes, with progress apparently tied to waking/tapping the screen.
@@ -104,8 +104,26 @@ Fitbit documents that AMOLED devices ignore `display.autoOff=false`; repeatedly
 waking the screen would not establish a reliable background stream. Timer counts
 versus runtime are intended to measure actual suspension on this firmware.
 
-Build and all 21 tests pass. Hardware installation and the next diagnostic wrist
-result are pending. The phone companion remains a separate unresolved checkpoint.
+The 0.1.2 diagnostic screen opened but stopped rendering partway through. USB
+exception notifications in 0.1.3 reported `TypeError: Expected a function` at
+`messaging.peerSocket.readyState` during local rendering/startup. Separately, a
+watch-side runtime feature log confirmed `Number.isFinite=undefined`. In the
+original probe, that numeric helper was called after incrementing the sensor
+counter and before setting status/BPM, explaining how an event count could grow
+while the display stayed at `waiting`.
+
+Revision 0.1.4 uses strict primitive finite-number checks and isolates all optional
+phone readiness, send and listener operations. Native phone exceptions cannot
+interrupt local sensor callbacks, rendering or timer installation. New tests
+model a missing Number helper and exceptions in phone readiness/bind/send. The
+USB helper records this probe's exception stacks and install/launch UUID/build
+metadata; it does not log raw HR or other apps' messages.
+
+All 25 tests and the FBA build pass. Build `00d2e094daff1fcb` was installed and
+its launch acknowledged over USB. A watch screenshot verifies DIAG 0.1.4, off
+wrist, wear=no, starts=0 and 8 timer ticks over 8 seconds while on its charger.
+This verifies running local callbacks and rendering, not actual BPM or screen-off
+acquisition. The next wrist test and the phone companion remain unresolved.
 
 ## Repeat the local USB watch test
 

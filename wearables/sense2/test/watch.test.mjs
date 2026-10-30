@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import fs from 'node:fs';
 const source=fs.readFileSync(new URL('../app/index.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
-function setup({activity=true,heart=true,bodyAvailable=true}={}) {
+function setup({activity=true,heart=true,bodyAvailable=true,modernNumber=true,brokenPeer=null}={}) {
  const ui={},sent=[],timers=[];let heartSensor,bodySensor,now=1_000_000;
  class FakeDate extends Date { constructor(...args){super(...(args.length?args:[now]));}static now(){return now;} }
  class HeartRateSensor {
@@ -19,10 +19,14 @@ function setup({activity=true,heart=true,bodyAvailable=true}={}) {
  }
  const me={appTimeoutEnabled:true,permissions:{granted:name=>name==='access_activity'?activity:heart}};
  const display={on:true,events:{},addEventListener(name,handler){this.events[name]=handler;}};
+ const peer={OPEN:1,readyState:1,bufferedAmount:0,send:frame=>sent.push(frame),addEventListener(){}};
+ if(brokenPeer==='state')Object.defineProperty(peer,'readyState',{get(){throw TypeError('Expected a function');}});
+ if(brokenPeer==='bind')peer.addEventListener=()=>{throw TypeError('Expected a function');};
+ if(brokenPeer==='send')peer.send=()=>{throw TypeError('Expected a function');};
  const context={document:{getElementById:id=>ui[id]??=({text:'',events:{},addEventListener(name,handler){this.events[name]=handler;}})},HeartRateSensor,
   BodyPresenceSensor:bodyAvailable?BodyPresenceSensor:undefined,me,display,
-  messaging:{peerSocket:{OPEN:1,readyState:1,bufferedAmount:0,send:frame=>sent.push(frame),addEventListener(){}}},
-  setInterval(handler){timers.push(handler);},console:{log(){}},Date:FakeDate,Math,Number,String};
+  messaging:{peerSocket:peer},
+  setInterval(handler){timers.push(handler);},console:{log(){}},Date:FakeDate,Math,Number:modernNumber?Number:{},String};
  vm.runInNewContext(source,context);
  return {ui,sent,display,me,get hr(){return heartSensor},get body(){return bodySensor},
   tick(ms=1000){now+=ms;timers.forEach(fn=>fn());},
@@ -95,3 +99,23 @@ test('pause stops the diagnostic sensor, resume requires a new reading, and inac
  h.read(120,101);assert.equal(h.ui.state.text,'waiting');
  h.read(120,102);assert.equal(h.ui.bpm.text,'120');
 });
+
+test('device numeric checks work when Number.isFinite is unavailable',()=>{
+ const h=setup({modernNumber:false});h.wear(true);h.read(120,100);
+ assert.equal(h.ui.bpm.text,'120');assert.equal(h.ui.state.text,'ok');
+ h.tick();assert.match(h.ui.runtime.text,/ticks 1/);assert.match(h.ui.count.text,/1 valid/);
+ for(const value of [null,undefined,NaN,Infinity,-Infinity,'120',0]){
+  h.read(value,++h.hr.timestamp);assert.equal(h.ui.state.text,'invalid reading');
+ }
+});
+
+for(const brokenPeer of ['state','bind','send']) {
+ test(`local acquisition/rendering survive a native peer ${brokenPeer} exception`,()=>{
+  const h=setup({brokenPeer});h.wear(true);h.read(120,100);h.tick();
+  assert.equal(h.ui.bpm.text,'120');assert.equal(h.ui.state.text,'ok');
+  assert.equal(h.ui.link.text,'Phone API unavailable');
+  assert.match(h.ui.count.text,/1 events \/ 1 unique \/ 1 valid/);
+  assert.match(h.ui.runtime.text,/ticks 1/);
+  h.tick(6000);assert.equal(h.ui.state.text,'stale');
+ });
+}

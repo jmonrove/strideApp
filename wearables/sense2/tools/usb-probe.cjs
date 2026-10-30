@@ -6,6 +6,7 @@ const AppContext = require('@fitbit/sdk-cli/lib/models/AppContext').default;
 const sideload = require('@fitbit/sdk-cli/lib/models/sideload');
 const captureScreenshot = require('@fitbit/sdk-cli/lib/models/captureScreenshot').default;
 const path = require('node:path');
+const probeUUID = require('../package.json').fitbit.appUUID;
 const { setTimeout: delay } = require('node:timers/promises');
 
 const action = process.argv[2] || 'info';
@@ -31,8 +32,14 @@ if (!['info', 'install', 'launch', 'screenshot'].includes(action)) {
     const host = connection.host;
     // No sensor values are logged or saved by this tool.
     host.on('consoleMessage', message => {
-      if (message.kind === 'error') console.error('WATCH ERROR',
+      if (message.emittedBy?.uuid === probeUUID && message.message?.[0]?.startsWith('HR_PROBE runtime features:'))
+        console.log('WATCH FEATURES', message.emittedBy.buildID, message.message[0]);
+      if (message.kind === 'error' && message.emittedBy?.uuid === probeUUID) console.error('WATCH ERROR',
         message.emittedBy?.buildID || 'unknown-build', ...(message.message || []));
+    });
+    host.on('consoleTrace', message => {
+      if (message.kind === 'exception' && message.emittedBy?.uuid === probeUUID)
+        console.error('WATCH EXCEPTION', JSON.stringify({buildID:message.emittedBy.buildID,message:message.message,stack:message.stack}));
     });
     console.log(JSON.stringify({ device: host.info.device, hardware: host.info.hardware,
       capabilities: host.info.capabilities }, null, 2));
@@ -40,11 +47,12 @@ if (!['info', 'install', 'launch', 'screenshot'].includes(action)) {
       const app = await new AppContext().loadAppPackage(path.resolve(__dirname, '../build/app.fba'));
       if (action === 'install') {
         const installed = await sideload.app(host, app);
-        console.log('Watch component:', installed ? installed.installType : 'already installed');
+        console.log('Watch install result:', JSON.stringify(installed || {alreadyInstalled:true}));
+        if (installed && installed.app.uuid !== app.uuid) throw Error('Installed UUID does not match this probe');
       }
       console.log('Launching STRIDE HR Probe. Phone companion is installed separately.');
-      await host.launchAppComponent({ uuid: app.uuid, component: 'app' });
-      console.log('Watch launch acknowledged.');
+      const launched = await host.launchAppComponent({ uuid: app.uuid, component: 'app' });
+      console.log('Watch launch acknowledged:', JSON.stringify(launched));
     } else if (action === 'screenshot') {
       if (!process.argv[3]) throw Error('Provide a new screenshot file path. Existing files are not overwritten.');
       await captureScreenshot(host, path.resolve(process.argv[3]));

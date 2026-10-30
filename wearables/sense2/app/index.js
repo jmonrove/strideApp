@@ -5,6 +5,12 @@ import { me } from 'appbit';
 import { display } from 'display';
 import * as messaging from 'messaging';
 
+console.log('HR_PROBE runtime features: Number.isFinite=' + typeof Number.isFinite);
+// Use primitive checks: the watch runtime may lack modern Number helpers.
+function finiteNumber(value) {
+  return typeof value === 'number' && value === value && value !== Infinity && value !== -Infinity;
+}
+
 // Request no inactivity termination. AMOLED display timeout remains system-managed;
 // this does not wake the screen, request AOD, or promise background execution.
 me.appTimeoutEnabled = false;
@@ -32,24 +38,34 @@ let status = 'waiting';
 let hrm = null;
 let hrmRequested = false;
 let body = null;
+let phoneUnavailable = false;
 const ui = {};
 ['bpm', 'state', 'link', 'count', 'clock', 'raw', 'last', 'runtime', 'wear', 'toggle', 'toggle-label']
   .forEach(id => ui[id] = document.getElementById(id));
 function describe(value) {
   if (value === null) return 'null';
   if (value === undefined) return 'undefined';
-  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : 'NaN';
+  if (typeof value === 'number') return finiteNumber(value) ? String(value) : 'NaN';
   return typeof value;
+}
+function phoneLabel() {
+  if (phoneUnavailable) return 'Phone API unavailable';
+  try {
+    return messaging.peerSocket.readyState === messaging.peerSocket.OPEN ? 'Phone connected' : 'Phone disconnected';
+  } catch (_) {
+    phoneUnavailable = true;
+    return 'Phone API unavailable';
+  }
 }
 function render() {
   const now = new Date();
-  ui.clock.text = 'DIAG 0.1.2  ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+  ui.clock.text = 'DIAG 0.1.4  ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
   ui.bpm.text = status === 'ok' ? String(latestBpm) : '--';
   ui.state.text = status.replace(/_/g, ' ');
-  ui.link.text = messaging.peerSocket.readyState === messaging.peerSocket.OPEN ? 'Phone connected' : 'Phone disconnected';
+  ui.link.text = phoneLabel();
   ui.count.text = eventCount + ' events / ' + uniqueCount + ' unique / ' + validCount + ' valid';
-  ui.raw.text = 'raw HR ' + describe(rawBpm) + ' / TS ' + (Number.isFinite(rawTimestamp) ? 'number' : describe(rawTimestamp));
-  ui.last.text = lastValidAt ? 'last ' + lastValidBpm + ' BPM / ' + Math.max(0, (Date.now() - lastValidAt) / 1000).toFixed(0) + 's ago' : 'last valid: none';
+  ui.raw.text = 'raw HR ' + describe(rawBpm) + ' / TS ' + (finiteNumber(rawTimestamp) ? 'number' : describe(rawTimestamp));
+  ui.last.text = lastValidAt ? 'last ' + lastValidBpm + ' BPM / ' + Math.max(0, Math.floor((Date.now() - lastValidAt) / 1000)) + 's ago' : 'last valid: none';
   ui.wear.text = 'wear ' + (onWrist === null ? '?' : onWrist ? 'yes' : 'no') + ' / flips ' + wearChanges + ' / starts ' + sensorStarts;
   ui.runtime.text = (display.on ? 'on' : 'off') + ' / wakes ' + wakeCount + ' / ticks ' + ticks + ' / ' + Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) + 's';
   ui['toggle-label'].text = paused ? 'Resume stream' : 'Pause stream';
@@ -62,10 +78,14 @@ function frame() {
 }
 function publish() {
   render();
-  if (messaging.peerSocket.readyState !== messaging.peerSocket.OPEN || messaging.peerSocket.bufferedAmount > 1024) return;
-  // Heartbeats never increment the sensor sequence or refresh observation time.
-  try { messaging.peerSocket.send(frame()); }
-  catch (error) { console.log('HR_PROBE watch send failed: ' + error.message); }
+  if (phoneUnavailable) return;
+  // Every native messaging operation is optional. A missing companion must not
+  // prevent local sensor/display callbacks or the diagnostic timer from running.
+  try {
+    const peer = messaging.peerSocket;
+    if (peer.readyState !== peer.OPEN || peer.bufferedAmount > 1024) return;
+    peer.send(frame());
+  } catch (_) { phoneUnavailable = true; render(); }
 }
 function invalidate(nextStatus) {
   status = nextStatus;
@@ -96,14 +116,14 @@ if (!me.permissions.granted('access_heart_rate') || !me.permissions.granted('acc
     eventCount++;
     rawBpm = hrm.heartRate;
     rawTimestamp = hrm.timestamp;
-    const unique = Number.isFinite(rawTimestamp) && rawTimestamp >= 0 && (lastSensorTimestamp === null || rawTimestamp > lastSensorTimestamp);
+    const unique = finiteNumber(rawTimestamp) && rawTimestamp >= 0 && (lastSensorTimestamp === null || rawTimestamp > lastSensorTimestamp);
     if (unique) { uniqueCount++; lastSensorTimestamp = rawTimestamp; }
     if (paused || onWrist !== true) { render(); return; }
-    if (!Number.isFinite(rawTimestamp) || rawTimestamp < 0) {
+    if (!finiteNumber(rawTimestamp) || rawTimestamp < 0) {
       invalidate('invalid_timestamp'); publish(); return;
     }
     if (!unique) { render(); return; }
-    if (!Number.isFinite(rawBpm) || rawBpm < 30 || rawBpm > 240) {
+    if (!finiteNumber(rawBpm) || rawBpm < 30 || rawBpm > 240) {
       invalidate('invalid_reading'); publish(); return;
     }
     sensorTimestamp = rawTimestamp;
@@ -165,11 +185,15 @@ display.addEventListener('change', () => {
   // Display changes only expose state; they do not restart sensing or freshen it.
   publish();
 });
-messaging.peerSocket.addEventListener('open', publish);
-messaging.peerSocket.addEventListener('close', render);
-messaging.peerSocket.addEventListener('message', event => {
-  if (event.data && event.data.kind === 'ack') ui.link.text = 'Phone received #' + event.data.sequence;
-});
+try {
+  if (!phoneUnavailable) {
+    messaging.peerSocket.addEventListener('open', publish);
+    messaging.peerSocket.addEventListener('close', render);
+    messaging.peerSocket.addEventListener('message', event => {
+      if (event.data && event.data.kind === 'ack') ui.link.text = 'Phone received #' + event.data.sequence;
+    });
+  }
+} catch (_) { phoneUnavailable = true; }
 setInterval(() => {
   ticks++;
   if (!paused && status === 'ok' && Date.now() - lastObservedAt > 5000) invalidate('stale');
