@@ -110,4 +110,24 @@ class BoardReadsTest {
         }
         assertEquals(1, count)
     }
+
+    @Test fun baseReadCommandIsIndependentOfTheOptionalCommandList() {
+        val queries = mutableListOf<BoardReads.Query>()
+        BoardInspection(exchange = { query ->
+            queries.add(query)
+            when (query) {
+                is BoardReads.Query.Information -> when (query.kind) {
+                    BoardReads.Info.IDENTITY -> BoardReads.Reply(4, 2, byteArrayOf(82, 1, 0, 0, 0, 0, 0, 0, 1, 1))
+                    BoardReads.Info.COMMANDS -> BoardReads.Reply(4, 2, byteArrayOf())
+                    else -> error("Optional metadata command was not advertised")
+                }
+                is BoardReads.Query.Values -> {
+                    assertEquals(0, BoardReads.request(query)[3].toInt())
+                    BoardReads.Reply(4, 2, byteArrayOf(0, 0))
+                }
+            }
+        }, report = {}).run()
+        assertEquals(3, queries.size)
+        assertTrue(queries.last() is BoardReads.Query.Values)
+    }
 }

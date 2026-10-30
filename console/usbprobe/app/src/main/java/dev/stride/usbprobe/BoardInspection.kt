@@ -8,10 +8,10 @@ class BoardInspection(
     fun run() {
         val root = readIdentity(2)
         val commands = BoardReads.commands(exchange(BoardReads.Query.Information(root.device, BoardReads.Info.COMMANDS)))
-        report("Supported commands: ${commands.sorted()}")
+        report("Advertised optional commands: ${commands.sorted()}")
         if (130 in commands) report(BoardReads.system(exchange(BoardReads.Query.Information(2, BoardReads.Info.SYSTEM))))
         if (132 in commands) report(BoardReads.version(exchange(BoardReads.Query.Information(2, BoardReads.Info.VERSION))))
-        val children = if (128 in commands) {
+        val children = if (root.device == 2 || 128 in commands) {
             BoardReads.devices(exchange(BoardReads.Query.Information(root.device, BoardReads.Info.DEVICES)))
                 .also { report("Advertised devices: $it") }
         } else emptyList()
@@ -21,9 +21,9 @@ class BoardInspection(
             5 in children -> readIdentity(5)
             else -> root
         }
-        val targetCommands = if (target.device == root.device) commands else
-            BoardReads.commands(exchange(BoardReads.Query.Information(target.device, BoardReads.Info.COMMANDS)))
-        if (2 !in targetCommands) { report("Read/status command not advertised; stopping."); return }
+        // iFit's QueueManager treats ReadWriteData (2) as a base command, independent
+        // of SupportedCommands' optional list. This path always has an empty write mask.
+        report("Base read/status query; write section remains empty.")
         val fields = BoardReads.Field.values().filter { it.id in target.fields }
         if (fields.isEmpty()) { report("No selected status fields advertised; stopping."); return }
         val query = BoardReads.Query.Values(target.device, fields)

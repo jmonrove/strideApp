@@ -44,8 +44,8 @@ as a full lint pass.
    WebView 83.0.4103.120. Opening inventory claims no interface.
 2. Check the actual WebView against the app's JavaScript and CSS requirements.
    A successful native build does not validate the HTML user interface.
-3. Confirm the motor-board transport and protocol before using the full app.
-   Android 5 support alone does not establish motor-board compatibility.
+3. Validate motor actuation and independent feedback before using the full app.
+   Query-only FitPro1 transport is verified below; motion has not been tested.
 4. Exercise Bluetooth and audio fallbacks on the console. They are statically
    API-checked, not yet validated on Android 5 hardware.
 
@@ -72,8 +72,8 @@ persist.adb.tcp.port stayed 5555 while the transient service.adb.tcp.port cleare
 No factory reset, package removal, or motor-control operation has been performed.
 
 Android USB inventory also confirms an ICON Generic HID controller with IDs
-213c:0002 and 64-byte HID interrupt endpoints 0x81 and 0x02. Protocol behavior
-and board identity remain unverified.
+213c:0002 and 64-byte HID interrupt endpoints 0x81 and 0x02. The later restricted
+query test below validates board identity and read-only FitPro1 communication.
 
 ## Inspection of installed iFit 2.6.86 (build 4458)
 
@@ -152,10 +152,10 @@ This is an alternative integration lead, not a working control API on this conso
 ### Restricted board-read probe
 
 The USB probe now has an isolated query codec and bounded metadata/status plan,
-with 16 passing JVM tests and a passing full lint/build on API 22-compatible code.
+with 17 passing JVM tests and a passing full lint/build on API 22-compatible code.
 Inventory and the query screen run on the physical console. Android USB permission
-was granted without selecting a default USB handler. A successful live identity
-and status snapshot has not yet been obtained.
+was granted without selecting a default USB handler. A complete live identity,
+limits and status query subsequently succeeded.
 
 The first non-forced claim was refused. Temporarily closing the main iFit app
 did not release the `usbfs` claim; closing Arda did. With the safety key still out,
@@ -167,8 +167,36 @@ The next version includes a bounded input-only drain and header diagnostics.
 Linux subsequently reattached `usbhid`, blocking another non-forced claim. An
 unchecked per-run option can permit detachment only when sysfs confirms `usbhid`
 on the sole matching controller; other or unknown owners are rejected. That
-additional mode remains pending an explicitly approved device test. No connect,
+additional mode was explicitly approved on the console for the read test. The
+interface was released and `usbhid` reattached after completion. No connect,
 unlock, mode/speed/incline write, calibration, reset or firmware operation was sent.
+
+The first successful identity run correctly stopped before status because the
+probe incorrectly required base command 2 to appear in SupportedCommands. The
+board advertises optional commands there; iFit's QueueManager treats command 2
+as a core command independently. The corrected probe preserves an empty write
+section and has a regression test for this distinction.
+
+The completed query sequence was 129, 136, 130, 132, 2. All five responses had
+valid lengths/checksums and successful status. Identity reported device address 4,
+software 82, hardware 1, model 14116, part 388129 and master library 82.55.
+The protocol manufacturer field varied across identity replies and is not used
+to identify or authorize the device; the USB VID/PID, model and part are used.
+
+| Status/limit | Board response |
+|---|---:|
+| Target / actual speed | 0 / 0 km/h |
+| Target / actual incline | 0 / 0% |
+| Minimum / maximum speed | 0.8 / 19.31 km/h (about 0.5 / 12 mph) |
+| Minimum / maximum incline | -3 / 15% |
+| Mode | 8, safety key out |
+
+This is one stationary snapshot with the safety key removed. It does not prove
+that the actual-speed or actual-incline fields track motion, that commands are
+accepted, or that read access survives a cold boot without iFit initialization.
+The optional command list includes VerifySecurity; the probe did not invoke it.
+iFit and Arda were temporarily stopped for the bench session and their packages
+and data were retained.
 
 Next validation should isolate identity/capability/status reads from initialization
 writes, then establish limits, safety-key/start behavior and independent feedback

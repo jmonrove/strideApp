@@ -14,7 +14,9 @@ The query path has its own restricted codec. It can construct only DeviceInfo,
 SupportedCommands, SupportedDevices, SystemInfo, VersionInfo, and ReadWriteData
 requests whose write section is empty. Status fields are restricted to target /
 actual speed and grade, RPM, mode and min/max limits. Optional commands and fields
-are queried only when advertised by the board. Serial numbers and pulse values
+are queried only when advertised by the board. Basic ReadWriteData is a core
+protocol command and need not appear in the board's optional-command list, matching
+iFit's QueueManager policy. Serial numbers and pulse values
 are omitted from reports.
 
 There are no builders for connect/disconnect, unlock, workout mode changes,
@@ -38,7 +40,7 @@ ANDROID_HOME=/path/to/android/sdk JAVA_HOME=/path/to/jdk ./gradlew \
   :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
 ```
 
-Sixteen JVM tests cover every nonempty subset of the ten status fields on each
+Seventeen JVM tests cover every nonempty subset of the ten status fields on each
 allowed address, request allowlists, corrupted/mismatched replies, signed units,
 capability filtering, blocked replies, bounded draining, partial writes, and the
 opt-in driver-claim fallback. These test software behavior; device support is

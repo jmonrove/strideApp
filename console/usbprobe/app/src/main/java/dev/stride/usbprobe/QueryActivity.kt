@@ -52,7 +52,10 @@ class QueryActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         manager = getSystemService(Context.USB_SERVICE) as UsbManager
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(20, 16, 20, 16) }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(20, 16, 20, 16)
+            setBackgroundColor(Color.WHITE)
+        }
         val explanation = TextView(this).apply {
             text = "Board identity/status — query only\nWorkout stopped, stand off belt, safety key removed.\nNo interface is claimed until you press the button."
             textSize = 17f; setTextColor(Color.BLACK)
@@ -60,6 +63,7 @@ class QueryActivity : Activity() {
         root.addView(explanation)
         allowHidDetach = CheckBox(this).apply {
             text = "Allow temporary kernel HID detach for this read test"
+            setTextColor(Color.BLACK)
             isChecked = false
         }
         root.addView(allowHidDetach)
@@ -70,7 +74,7 @@ class QueryActivity : Activity() {
         root.addView(start)
         output = TextView(this).apply { textSize = 14f; typeface = Typeface.MONOSPACE; setTextColor(Color.BLACK) }
         root.addView(output)
-        setContentView(ScrollView(this).apply { addView(root) })
+        setContentView(ScrollView(this).apply { setBackgroundColor(Color.WHITE); addView(root) })
         val filter = IntentFilter(PERMISSION)
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
         else { @Suppress("UnspecifiedRegisterReceiverFlag") registerReceiver(receiver, filter) }
