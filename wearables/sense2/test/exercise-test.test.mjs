@@ -85,23 +85,59 @@ test('wear loss and HR pause stop only the owned test',()=>{
 test('explicit stop and unload cleanup are idempotent for completed tests',()=>{
  const h=setup();h.start();h.controller.stop('Probe closed');h.controller.stop('Probe closed');assert.equal(h.stops,1);
 });
-test('native start failure does not retry or leak ownership when state remained stopped',()=>{
- const h=setup({startFails:true});assert.equal(h.start().phase,'error');assert.equal(h.controller.snapshot().owned,false);
+test('native start failure stays guarded and never retries, including a partial late start',()=>{
+ const h=setup({startFails:true});assert.equal(h.start().phase,'error');assert.equal(h.controller.snapshot().owned,true);
  assert.deepEqual(h.controller.snapshot().failure,{stage:'native start',name:'TypeError',detail:'Native start error',state:'stopped'});
  h.advance(60000);assert.equal(h.starts,1);assert.equal(h.stops,0);
+ h.controller.arm(h.input);h.controller.confirm(h.input);assert.equal(h.starts,1);
+ h.api.state='started';h.advance();assert.equal(h.stops,1);assert.equal(h.controller.snapshot().owned,false);
 });
-test('a returned but unconfirmed start is distinguished from a native exception',()=>{
- const h=setup({startNoChange:true});assert.equal(h.start().phase,'error');
- assert.deepEqual(h.controller.snapshot().failure,{stage:'state after return',name:'Unconfirmed',detail:'start returned; state=stopped',state:'stopped'});
- h.advance();assert.equal(h.starts,1);assert.equal(h.stops,0);
- h.api.state='started';h.advance();assert.equal(h.controller.snapshot().failure.state,'started');
- assert.equal(h.starts,1);assert.equal(h.stops,0);
+test('asynchronous start retains ownership, confirms later, and still ends at the original deadline',()=>{
+ const h=setup({startNoChange:true});assert.equal(h.start().phase,'starting');
+ assert.equal(h.controller.snapshot().owned,true);assert.equal(h.controller.snapshot().failure,null);
+ h.advance();h.controller.confirm(h.input);assert.equal(h.starts,1);assert.equal(h.stops,0);
+ h.api.state='started';h.api.onstatechange();
+ h.advance();assert.equal(h.controller.snapshot().phase,'active');assert.equal(h.controller.snapshot().startDelayMs,2000);
+ assert.equal(h.controller.snapshot().stateEvents,1);assert.equal(h.controller.snapshot().remainingSec,58);
+ h.controller.reading();h.advance(58000);assert.equal(h.stops,1);assert.equal(h.controller.snapshot().owned,false);
 });
 test('failed or unconfirmed stop remains visible and blocks a replacement recording',()=>{
  for(const settings of [{stopFails:true},{stopUnconfirmed:true}]){
   const h=setup(settings);h.start();h.advance(60000);
-  assert.equal(h.controller.snapshot().phase,'error');assert.equal(h.controller.snapshot().owned,true);
+  assert.equal(h.controller.snapshot().phase,settings.stopFails?'error':'stopping');assert.equal(h.controller.snapshot().owned,true);
   h.controller.arm(h.input);h.controller.confirm(h.input);assert.equal(h.starts,1);
+  h.advance(10000);assert.equal(h.controller.snapshot().phase,'error');assert.equal(h.stops,1);
   h.advance(60000);assert.equal(h.stops,1);
  }
+});
+test('a cancelled pending start remains guarded and stops its late transition exactly once',()=>{
+ const h=setup({startNoChange:true});h.start();h.controller.stop('User stopped');
+ assert.equal(h.stops,0);assert.equal(h.controller.snapshot().owned,true);
+ h.api.state='started';h.advance();assert.equal(h.stops,1);assert.equal(h.controller.snapshot().phase,'done');
+ h.advance();assert.equal(h.stops,1);assert.equal(h.starts,1);
+});
+test('wear loss or HR pause cancels a pending request before its delayed start',()=>{
+ for(const field of ['onWrist','paused']){
+  const h=setup({startNoChange:true});h.start();h.input[field]=field==='paused';h.advance();
+  assert.equal(h.stops,0);h.api.state='started';h.advance();assert.equal(h.stops,1);
+ }
+});
+test('a start timeout blocks replacement requests and stops a transition arriving after the test deadline',()=>{
+ const h=setup({startNoChange:true});h.start();h.advance(10000);
+ assert.equal(h.controller.snapshot().phase,'error');assert.equal(h.controller.snapshot().owned,true);
+ assert.match(h.controller.snapshot().message,/late start guarded/);
+ h.controller.arm(h.input);h.controller.confirm(h.input);assert.equal(h.starts,1);
+ h.advance(60000);h.api.state='started';h.advance();assert.equal(h.stops,1);assert.equal(h.controller.snapshot().owned,false);
+});
+test('an asynchronous stop is sent once and ownership is released only after stopped is observed',()=>{
+ const h=setup({stopUnconfirmed:true});h.start();h.advance(60000);
+ assert.equal(h.controller.snapshot().phase,'stopping');assert.equal(h.controller.snapshot().owned,true);
+ h.advance();h.controller.stop('User stopped');assert.equal(h.stops,1);
+ h.api.state='stopped';h.api.onstatechange();h.advance();
+ assert.equal(h.controller.snapshot().phase,'done');assert.equal(h.controller.snapshot().owned,false);assert.equal(h.stops,1);
+});
+test('optional native state-event binding failure leaves polling and lifecycle cleanup working',()=>{
+ const h=setup({startNoChange:true});Object.defineProperty(h.api,'onstatechange',{set(){throw TypeError('Unsupported listener');}});
+ h.start();h.api.state='started';h.advance();assert.equal(h.controller.snapshot().phase,'active');
+ h.controller.stop('Probe closed');assert.equal(h.stops,1);assert.equal(h.controller.snapshot().owned,false);
 });

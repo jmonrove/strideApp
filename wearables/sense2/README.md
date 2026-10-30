@@ -15,7 +15,7 @@ photos; continuous acquisition and watch-to-phone forwarding are not.
 ## Current validation (2026-10-30)
 
 - Watch, companion and settings components build to `build/app.fba`.
-- Fifty Node tests cover schema validation, delayed/stale readings, future clocks,
+- Fifty-six Node tests cover schema validation, delayed/stale readings, future clocks,
   off-wrist/paused state, duplicate heartbeats, retired sessions, stalled delivery,
   opt-in authenticated forwarding, missing watch permissions, missing wear
   detection, failure of wear detection while streaming, and repeated presence
@@ -171,11 +171,14 @@ and Confirm sequence. Revision 0.1.7 also performs a guarded, read-only state
 inspection at launch; starting still requires Start and Confirm while wear is
 confirmed and HR is unpaused. The confirmation
 states that it records a 60-second Treadmill test. GPS and autopause are disabled.
-The Exercise API start/stop behavior, exercise permission at use time, and faster
-cadence have not been verified on the Sense 2 yet. Unsupported modules/permissions leave passive HR usable.
+The 0.1.8 device screenshot subsequently confirmed a delayed native `started`
+state after a user request. Correct end-to-end start/stop timing and faster HR
+cadence remain unverified. Unsupported modules/permissions leave passive HR usable.
 
-An owned test stops after 60 seconds when its timer runs, on explicit Stop, on HR
-pause/wear loss, or on native pause. Unload cleanup is best effort and synchronous;
+The current controller requests stop after 60 seconds from the original request
+when its timer runs, on explicit Stop, on HR pause/wear loss, or on native pause.
+It waits for native `stopped` confirmation rather than assuming stop is synchronous.
+Unload cleanup is best effort and synchronous;
 a killed/suspended runtime cannot guarantee a timely stop. If stop cannot be
 confirmed, the probe retains ownership, blocks replacement starts and instructs
 the user to end the exercise in Fitbit. It never stops an exercise already active
@@ -378,4 +381,35 @@ state without retrying start or adopting/stopping a later exercise. The
 existing explicit confirmation and synchronous start verification are unchanged.
 No sensor values enter the diagnostics. Fifty tests pass, including native
 exceptions, unconfirmed returns, read-only follow-up, and visible errors
-surviving off-wrist events. Native recording remains unverified.
+surviving off-wrist events. At this checkpoint native recording was unverified;
+the next screenshot below establishes a delayed native start.
+
+### Delayed native lifecycle correction 0.1.9
+
+The user reported `Start failed: Unconfirmed/stopped`. A USB screenshot of 0.1.8
+showed both the captured immediate `stopped` result and the later current state
+`started`. The native call had taken effect asynchronously. The old controller
+had dropped ownership and its stop timer before that transition; its failure
+message was incorrect, and its 60-second bound did not cover this case. The user
+was told to close the probe and end the test recording if shown in Fitbit.
+
+Version 0.1.9 retains the request through `starting`, `active`, and `stopping`,
+polling native state once per timer callback. Optional state-change events are
+counted but never make native writes inside the callback. The recording deadline
+remains 60 seconds from the original request, not 60 additional seconds after
+confirmation. Stop is sent once, and ownership is released only after a confirmed
+start is followed by a confirmed `stopped` state. The UI shows waiting, cancel,
+countdown, and stop-confirmation states explicitly.
+
+A pending request cancelled by the user, wear loss, HR pause, clock rollback, or
+a 10-second start timeout remains guarded: if it starts later while the probe is
+alive, it receives a stop request, and no replacement start is allowed meanwhile.
+After a stop failure/timeout, the app observes further state without repeating
+stop writes and directs the user to Fitbit. Closing or terminating the runtime
+while a native request is pending cannot guarantee that a later transition will
+be handled; this is still a diagnostic requiring on-watch verification.
+
+All 56 tests pass, including delayed start/stop, cancellation before a delayed
+start, timeout followed by a very late start, no overlapping replacement calls,
+and the complete delayed lifecycle through the watch UI. Existing foreign-workout,
+wear, freshness, permission, and no-auto-start checks remain covered.

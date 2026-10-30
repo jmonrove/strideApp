@@ -163,6 +163,17 @@ test('native start errors remain visible after off-wrist events while passive HR
  h.wear(true);h.read(120,100);assert.equal(h.ui.bpm.text,'120');
  assert.equal(starts,1);assert.match(h.ui.wear.text,/state now: stopped/);
 });
+test('watch UI follows delayed native start and stop instead of dropping the test timer',()=>{
+ let starts=0,stops=0;const nativeExercise={state:'stopped',start(){starts++;},stop(){stops++;}};
+ const h=setup({nativeExercise});h.wear(true);
+ h.ui['exercise-toggle'].events.click();h.ui['exercise-toggle'].events.click();
+ assert.equal(starts,1);assert.equal(h.ui['exercise-label'].text,'Cancel start');assert.match(h.ui.exercise.text,/Starting/);
+ h.tick();assert.equal(stops,0);nativeExercise.state='started';nativeExercise.onstatechange();h.tick();
+ assert.equal(h.ui['exercise-label'].text,'Stop test');assert.match(h.ui.exercise.text,/TEST 58s/);
+ h.read(120,100);h.tick(58000);assert.equal(stops,1);assert.equal(h.ui['exercise-label'].text,'Stopping...');
+ h.tick();assert.equal(stops,1);nativeExercise.state='stopped';nativeExercise.onstatechange();h.tick();
+ assert.equal(h.ui['exercise-label'].text,'Start 60s test');assert.match(h.ui.exercise.text,/Test complete/);
+});
 test('denied or unsupported exercise access leaves passive heart-rate readings functional',()=>{
  for(const exercisePermission of [false,true]){
   const h=setup({exercisePermission});h.wear(true);
