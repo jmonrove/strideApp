@@ -446,3 +446,8 @@ timestamps, advance sensor sequence, or count as eligible sensor readings. Nativ
 stats errors cannot interrupt the existing start/stop lifecycle or passive HR.
 All 62 tests and the FBA build pass, including isolation of the statistics channel
 and freezing comparison counters after completion. No new permissions are added.
+
+The SDK acknowledged 0.1.10 build `00d2b5977e6914a8` after one bounded reinstall
+following the recurring first-launch timeout/“App not installed” behavior. Launch
+and a watch screenshot verify the new idle UI, and the read-only native state is
+`stopped`. The comparison test still requires the user’s on-watch Start/Confirm.
