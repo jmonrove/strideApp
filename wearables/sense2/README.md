@@ -14,11 +14,14 @@ sensor API. No live watch reading has been verified yet.
 ## Current validation (2026-10-30)
 
 - Watch, companion and settings components build to `build/app.fba`.
-- Sixteen Node tests cover schema validation, delayed/stale readings, future clocks,
+- Twenty-one Node tests cover schema validation, delayed/stale readings, future clocks,
   off-wrist/paused state, duplicate heartbeats, retired sessions, stalled delivery,
   opt-in authenticated forwarding, missing watch permissions, missing wear
   detection, failure of wear detection while streaming, and repeated presence
-  events preserving fresh BPM without restarting acquisition.
+  events preserving fresh BPM without restarting acquisition. Diagnostic tests also
+  distinguish raw callbacks from valid data, reject absent/backwards timestamps,
+  retain acquisition across transient wear changes without forwarding off-wrist
+  input, and verify that display/timer events cannot freshen or restart readings.
 - SDK developer login was attempted on 2026-10-29, but the browser authorization
   route showed 403 Forbidden and did not return an authorization callback.
 - The phone's Developer Bridge was found under the Sense 2 device page and
@@ -72,6 +75,37 @@ sensor API. No live watch reading has been verified yet.
   `App not installed` reply on a fresh connection. A subsequent bounded install
   and launch succeeded. The cause of that intermittent installation failure is
   unresolved; no automatic retry loop is used.
+
+## Diagnostic revision 0.1.2
+
+The second wrist test still showed `waiting` / `--`: 13 counted readings in
+roughly two minutes, with progress apparently tied to waking/tapping the screen.
+That does not establish usable BPM or continuous screen-off acquisition.
+
+The diagnostic revision adds a visible version label and separate counters for
+all HR callbacks, unique advancing sensor timestamps, and eligible BPM readings.
+It shows raw HR/type, whether a sensor timestamp exists, confirmed wear state,
+wear-state changes, sensor start count, the last valid BPM with its age, display
+wake count, timer ticks and wall-clock runtime. Last-valid/raw diagnostics never
+substitute for current eligible BPM and are not added to outbound frames or logs.
+
+After the first confirmed on-wrist start, transient off-wrist reports immediately
+invalidate eligible streaming data but no longer repeatedly stop/start the optical
+acquisition during this diagnostic. Events received off wrist remain diagnostic
+only. Returning to confirmed wear requires a new advancing sensor reading. Explicit
+Pause or a wear-detection error still stops acquisition. This is a test of whether
+wear-state flapping starves acquisition, not a claim that it caused the observed
+failure. Real workout automation still cannot use unknown/off-wrist/stale input.
+
+The app requests `appTimeoutEnabled=false` while unpaused and restores timeout
+when paused. It observes ordinary display-change events and does not force the
+screen awake, request AOD privileges, or assume screen-off execution is available.
+Fitbit documents that AMOLED devices ignore `display.autoOff=false`; repeatedly
+waking the screen would not establish a reliable background stream. Timer counts
+versus runtime are intended to measure actual suspension on this firmware.
+
+Build and all 21 tests pass. Hardware installation and the next diagnostic wrist
+result are pending. The phone companion remains a separate unresolved checkpoint.
 
 ## Repeat the local USB watch test
 
@@ -179,6 +213,8 @@ transport and controller verification remain prerequisites for physical adaptati
 
 ## References
 
+- [Official Appbit timeout reference](https://dev.fitbit.com/build/reference/device-api/appbit/)
+- [Official display reference](https://dev.fitbit.com/build/reference/device-api/display/)
 - [Official heart-rate guide](https://dev.fitbit.com/build/guides/sensors/heart-rate/)
 - [Official permission guide](https://dev.fitbit.com/build/guides/permissions/)
 - [Official OAuth authorization endpoint](https://dev.fitbit.com/build/reference/web-api/authorization/authorize/)

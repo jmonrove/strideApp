@@ -1,8 +1,13 @@
 .background { viewport-fill: #08151c; }
-text { fill: #d8eaf0; font-family: System-Regular; text-anchor: middle; text-length: 40; font-size: 18; }
-#title { fill: #6dd6e9; font-size: 22; }
-#clock { fill: #9bb5c1; font-size: 22; }
-#bpm { fill: white; font-size: 88; font-family: System-Bold; }
-#state { fill: #80d7b2; }
-#count { fill: #9bb5c1; font-size: 16; }
-#toggle-label { fill: white; }
+text { fill: #d8eaf0; font-family: System-Regular; text-anchor: middle; text-length: 48; font-size: 15; }
+#title { fill: #6dd6e9; font-size: 21; }
+#clock { fill: #9bb5c1; font-size: 16; }
+#bpm { fill: white; font-size: 72; font-family: System-Bold; }
+#state { fill: #80d7b2; font-size: 18; }
+#raw { fill: #e9c27b; font-size: 15; }
+#last { fill: #9bb5c1; }
+#wear { fill: #9bb5c1; }
+#count { fill: #9bb5c1; font-size: 15; }
+#runtime { fill: #9bb5c1; font-size: 15; }
+#link { font-size: 14; }
+#toggle-label { fill: white; font-size: 16; }
