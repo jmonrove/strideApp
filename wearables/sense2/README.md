@@ -19,6 +19,14 @@ sensor API. No live watch reading has been verified yet.
   and opt-in authenticated forwarding.
 - SDK developer login was attempted on 2026-10-29, but the browser authorization
   route showed 403 Forbidden and did not return an authorization callback.
+- The phone's Developer Bridge was found under the Sense 2 device page and
+  enabled after developer registration. General Settings / Services / Labs was
+  the wrong location. Relay discovery still fails with no stored SDK auth token;
+  enabling the phone bridge does not complete the Mac's SDK sign-in.
+- Local USB discovery returned no watch hosts. A watch-side USB debug test is
+  pending because its charger was unavailable. The newer CLI 1.8.0-pre.11 was
+  inspected: it has the same authentication implementation and production relay
+  configuration as pre.10, so it was not substituted as an unproven login fix.
 - Gallery App Manager sign-in and developer registration succeeded. A private
   STRIDE HR Probe clockface draft has been created and the FBA attached. The
   authorized Publish Clockface action returned a generic HTTP 400, both with
@@ -55,7 +63,9 @@ that silently change the beta SDK target behavior.
 ## First hardware test
 
 Use the phone app already paired to the Sense 2 (Fitbit, called Google Health in
-newer documentation). Check whether it exposes Developer Menu / Developer Bridge.
+newer documentation). Open the Sense 2 device page, then System / Developer Menu;
+Developer Bridge was found and enabled there on this user's phone. This is
+separate from the app's general Settings / Services / Labs menu.
 Some experimental workflows also require the watch on its USB charger with
 Developer Bridge / USB debugging enabled in watch settings. These options and the
 private app-installation route must be verified on the installed versions.
@@ -107,6 +117,7 @@ transport and controller verification remain prerequisites for physical adaptati
 - [Official heart-rate guide](https://dev.fitbit.com/build/guides/sensors/heart-rate/)
 - [Official messaging guide](https://dev.fitbit.com/build/guides/communications/messaging/)
 - [Official publishing guide](https://dev.fitbit.com/build/guides/publishing/)
+- [Google support developer-mode instructions](https://support.google.com/googlehealth/thread/433273147/how-to-enable-developer-mode?hl=en)
 - [Beta Sense 2 SDK investigation](https://github.com/yeohongred/fitbit-versa4-sense2-sdk)
 - [Experimental developer bridge workflow](https://github.com/cmengler/fitbit-app-versa4)
 
