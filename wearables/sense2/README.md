@@ -413,3 +413,9 @@ All 56 tests pass, including delayed start/stop, cancellation before a delayed
 start, timeout followed by a very late start, no overlapping replacement calls,
 and the complete delayed lifecycle through the watch UI. Existing foreign-workout,
 wear, freshness, permission, and no-auto-start checks remain covered.
+
+Installation checkpoint: after the first launch timed out and a fresh launch
+reported “App not installed,” one bounded reinstall and launch acknowledged
+0.1.9 build `031f1de14c509a59`. Its read-only startup log reported `stopped`.
+No exercise was started remotely. Corrected on-watch lifecycle verification
+remains pending; unit-test results do not establish physical stop timing.
