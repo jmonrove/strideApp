@@ -71,7 +71,7 @@ function phoneLabel() {
 }
 function render() {
   const now = new Date();
-  ui.clock.text = 'DIAG 0.1.7  ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+  ui.clock.text = 'DIAG 0.1.8  ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
   ui.bpm.text = status === 'ok' ? String(latestBpm) : '--';
   ui.state.text = status.replace(/_/g, ' ');
   ui.link.text = phoneLabel() + (buttonTaps ? ' / taps ' + buttonTaps : '');
@@ -82,6 +82,11 @@ function render() {
   ui.runtime.text = (display.on ? 'on' : 'off') + ' / wakes ' + wakeCount + ' / ticks ' + ticks + ' / ' + Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) + 's';
   ui['toggle-label'].text = paused ? 'Resume HR' : 'Pause HR';
   const test = exerciseTest.snapshot();
+  if (test.failure) {
+    ui.raw.text = test.failure.stage + ': ' + test.failure.name;
+    ui.last.text = test.failure.detail.slice(0, 48);
+    ui.wear.text = test.failure.detail.length > 48 ? test.failure.detail.slice(48, 96) : 'Fitbit state now: ' + test.failure.state;
+  }
   ui.exercise.text = test.phase === 'active' ? 'TEST ' + test.remainingSec + 's / ' + test.samples + ' reads / gap ' + test.maxGapSec + 's' : test.phase === 'idle' && !exerciseInfo.valid ? 'Exercise state: ' + exerciseInfo.state : test.message;
   ui['exercise-label'].text = test.owned ? 'Stop test' : test.phase === 'armed' ? 'Confirm recording' : 'Start 60s test';
 }

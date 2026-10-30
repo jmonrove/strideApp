@@ -15,7 +15,7 @@ photos; continuous acquisition and watch-to-phone forwarding are not.
 ## Current validation (2026-10-30)
 
 - Watch, companion and settings components build to `build/app.fba`.
-- Forty-eight Node tests cover schema validation, delayed/stale readings, future clocks,
+- Fifty Node tests cover schema validation, delayed/stale readings, future clocks,
   off-wrist/paused state, duplicate heartbeats, retired sessions, stalled delivery,
   opt-in authenticated forwarding, missing watch permissions, missing wear
   detection, failure of wear detection while streaming, and repeated presence
@@ -361,3 +361,21 @@ This confirms the current state, not the cause of the earlier rejection. The
 48 tests cover unknown-state diagnostics and read-only inspection preserving
 confirmation, ownership, passive HR, and foreign-exercise protection. The
 on-watch Start/Confirm recording test is still pending.
+
+### Start failure diagnostics 0.1.8
+
+The user reached “Exercise start failed; no automatic retry” in 0.1.7. That
+message did not distinguish an exception in the native `start()` call from a
+call that returned without immediately reporting `started`. It establishes a
+failed verification, not the native reason or that no short record was created.
+
+Revision 0.1.8 preserves the failure stage, exception name/message (up to 96
+characters), and native state. After failure, three sensor-detail rows instead
+show these diagnostics; the primary HR display and freshness checks keep
+working. Diagnostics survive removal from the wrist and are cleared only by
+the next explicit Start attempt. Error-state ticks observe the latest native
+state without retrying start or adopting/stopping a later exercise. The
+existing explicit confirmation and synchronous start verification are unchanged.
+No sensor values enter the diagnostics. Fifty tests pass, including native
+exceptions, unconfirmed returns, read-only follow-up, and visible errors
+surviving off-wrist events. Native recording remains unverified.

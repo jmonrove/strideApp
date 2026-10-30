@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createExerciseTest} from '../app/exercise-test.js';
-function setup({permission=true,existing='stopped',unsupported=false,startFails=false,stopFails=false,stopUnconfirmed=false}={}) {
+function setup({permission=true,existing='stopped',unsupported=false,startFails=false,startNoChange=false,stopFails=false,stopUnconfirmed=false}={}) {
  let now=100000,loads=0,starts=0,stops=0;
- const api={state:existing,start(type,options){starts++;api.type=type;api.options=options;if(startFails)throw Error('Native start error');api.state='started';},
+ const api={state:existing,start(type,options){starts++;api.type=type;api.options=options;if(startFails)throw TypeError('Native start error');if(!startNoChange)api.state='started';},
   stop(){stops++;if(stopFails)throw Error('Native stop error');if(!stopUnconfirmed)api.state='stopped';}};
  const controller=createExerciseTest({now:()=>now,permission:()=>permission,load(){loads++;if(unsupported)throw Error('Module unavailable');return api;}});
  const input={onWrist:true,paused:false};
@@ -87,7 +87,15 @@ test('explicit stop and unload cleanup are idempotent for completed tests',()=>{
 });
 test('native start failure does not retry or leak ownership when state remained stopped',()=>{
  const h=setup({startFails:true});assert.equal(h.start().phase,'error');assert.equal(h.controller.snapshot().owned,false);
+ assert.deepEqual(h.controller.snapshot().failure,{stage:'native start',name:'TypeError',detail:'Native start error',state:'stopped'});
  h.advance(60000);assert.equal(h.starts,1);assert.equal(h.stops,0);
+});
+test('a returned but unconfirmed start is distinguished from a native exception',()=>{
+ const h=setup({startNoChange:true});assert.equal(h.start().phase,'error');
+ assert.deepEqual(h.controller.snapshot().failure,{stage:'state after return',name:'Unconfirmed',detail:'start returned; state=stopped',state:'stopped'});
+ h.advance();assert.equal(h.starts,1);assert.equal(h.stops,0);
+ h.api.state='started';h.advance();assert.equal(h.controller.snapshot().failure.state,'started');
+ assert.equal(h.starts,1);assert.equal(h.stops,0);
 });
 test('failed or unconfirmed stop remains visible and blocks a replacement recording',()=>{
  for(const settings of [{stopFails:true},{stopUnconfirmed:true}]){

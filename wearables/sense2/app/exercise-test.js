@@ -12,6 +12,7 @@ export function createExerciseTest(options) {
   let samples = 0;
   let lastSampleAt = 0;
   let maxGapMs = 0;
+  let failure = null;
   function clock() {
     const value = options.now();
     if (typeof value !== 'number' || value !== value || value < 0 || value === Infinity) throw Error('Invalid clock');
@@ -24,6 +25,21 @@ export function createExerciseTest(options) {
     if (typeof value === 'string') return value.slice(0, 24);
     if (typeof value === 'number' || typeof value === 'boolean') return String(value);
     return typeof value;
+  }
+  function errorText(error) {
+    // Native diagnostics only. Do not inspect stats or include sensor values.
+    try {
+      if (error && typeof error.message === 'string') return error.message.slice(0, 96);
+      if (typeof error === 'string') return error.slice(0, 96);
+    } catch (_) {}
+    return 'No native error message';
+  }
+  function errorName(error) {
+    try { if (error && typeof error.name === 'string') return error.name.slice(0, 24); } catch (_) {}
+    return typeof error;
+  }
+  function nativeState() {
+    try { return stateLabel(api.state); } catch (_) { return 'state getter threw'; }
   }
   function inspect() {
     try {
@@ -38,7 +54,7 @@ export function createExerciseTest(options) {
   }
   function snapshot() {
     const elapsed = phase === 'active' ? Math.max(0, lastClock - startedAt) : 0;
-    return {phase, message, owned, samples, maxGapSec: Math.ceil(maxGapMs / 1000),
+    return {phase, message, owned, samples, failure, maxGapSec: Math.ceil(maxGapMs / 1000),
       remainingSec: phase === 'active' ? Math.max(0, 60 - Math.floor(elapsed / 1000)) : 0};
   }
   function stop(reason) {
@@ -63,6 +79,7 @@ export function createExerciseTest(options) {
   }
   function arm(input) {
     if (owned) return snapshot();
+    failure = null;
     if (!allowed(input)) { phase = 'blocked'; message = 'Wear watch; resume HR before test'; changed(); return snapshot(); }
     phase = 'armed';
     armedUntil = clock() + 10000;
@@ -100,13 +117,20 @@ export function createExerciseTest(options) {
     startedAt = clock(); lastClock = startedAt; callbacks = 0;
     samples = 0; lastSampleAt = 0; maxGapMs = 0;
     owned = true;
+    let startReturned = false;
     try {
       api.start('treadmill', {gps:false, autopause:false});
-      if (api.state !== 'started') throw Error('Start not confirmed');
+      startReturned = true;
+      const after = api.state;
+      if (after !== 'started') {
+        failure = {stage:'state after return', name:'Unconfirmed', detail:'start returned; state=' + stateLabel(after), state:stateLabel(after)};
+        throw Error('Start not confirmed');
+      }
       phase = 'active'; message = 'Recording test activity';
-    } catch (_) {
+    } catch (error) {
+      if (!failure) failure = {stage:startReturned ? 'read state after start' : 'native start', name:errorName(error), detail:errorText(error), state:nativeState()};
       stop('Start failed');
-      if (!owned) { phase = 'error'; message = 'Exercise start failed; no automatic retry'; }
+      if (!owned) { phase = 'error'; message = 'Start failed: ' + failure.name + ' / ' + failure.state; }
     }
     changed();
     return snapshot();
@@ -121,6 +145,8 @@ export function createExerciseTest(options) {
   }
   function tick(input) {
     const time = clock();
+    // Read-only follow-up distinguishes a stable rejection from a late change.
+    if (phase === 'error' && failure && !owned) failure.state = nativeState();
     if (phase === 'armed' && (time >= armedUntil || !allowed(input))) {
       phase = 'idle'; message = 'Start cancelled; nothing recorded'; changed();
     }

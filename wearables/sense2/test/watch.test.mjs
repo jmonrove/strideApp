@@ -154,6 +154,15 @@ test('read-only startup reports an unknown exercise state without breaking passi
  h.ui['exercise-toggle'].events.click();h.ui['exercise-toggle'].events.click();
  assert.equal(h.ui.exercise.text,'Exercise state: undefined; blocked');assert.equal(writes,0);
 });
+test('native start errors remain visible after off-wrist events while passive HR still works',()=>{
+ let starts=0;const nativeExercise={state:'stopped',start(){starts++;throw TypeError('Expected a function');},stop(){throw Error('Must not stop a rejected start');}};
+ const h=setup({nativeExercise});h.wear(true);
+ h.ui['exercise-toggle'].events.click();h.ui['exercise-toggle'].events.click();
+ assert.equal(h.ui.raw.text,'native start: TypeError');assert.equal(h.ui.last.text,'Expected a function');
+ h.wear(false);h.tick();assert.equal(h.ui.last.text,'Expected a function');
+ h.wear(true);h.read(120,100);assert.equal(h.ui.bpm.text,'120');
+ assert.equal(starts,1);assert.match(h.ui.wear.text,/state now: stopped/);
+});
 test('denied or unsupported exercise access leaves passive heart-rate readings functional',()=>{
  for(const exercisePermission of [false,true]){
   const h=setup({exercisePermission});h.wear(true);
