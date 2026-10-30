@@ -156,7 +156,7 @@ requires an explicit user start and the exercise permission.
 The display still reports the phone disconnected. SDK OAuth/Gallery installation
 blocks for the companion remain; watch-local BPM is not a verified phone stream.
 
-## Integrated exercise test 0.1.5 (prepared, not installed)
+## Integrated exercise test 0.1.5 (installed; recording test pending)
 
 The user confirmed that the probe could be revisited only after ending the native
 Fitbit workout. The completed-workout photo therefore does not establish HR
@@ -165,12 +165,12 @@ a concurrent comparison for this probe.
 
 Revision 0.1.5 adds an optional exercise session inside the probe using
 `access_exercise`. This is a new permission to create Fitbit Activity Log records;
-installation is pending explicit user approval. Nothing starts at app launch.
+the user explicitly approved installation with this permission. Nothing starts at app launch.
 The native exercise module is loaded lazily only after an on-watch Start and
 Confirm sequence while wear is confirmed and HR is unpaused. The confirmation
 states that it records a 60-second Treadmill test. GPS and autopause are disabled.
-No native exercise API, permission grant or faster cadence has been verified on
-the Sense 2 yet. Unsupported modules/permissions leave passive HR usable.
+The Exercise API start/stop behavior, exercise permission at use time, and faster
+cadence have not been verified on the Sense 2 yet. Unsupported modules/permissions leave passive HR usable.
 
 An owned test stops after 60 seconds when its timer runs, on explicit Stop, on HR
 pause/wear loss, or on native pause. Unload cleanup is best effort and synchronous;
@@ -315,3 +315,10 @@ transport and controller verification remain prerequisites for physical adaptati
 
 The probe's source is newly written under the parent project's Apache-2.0 license.
 The references are not a guarantee of current device compatibility.
+
+Installation checkpoint: after the user approved the new permission, SDK USB
+installation and launch acknowledged build `0d41e117a9cb174c`. A watch screenshot
+verifies DIAG 0.1.5, eight timer callbacks over eight seconds, zero HR events on
+the charger, and the idle “Start 60s test” control with its recording notice.
+No exercise was started remotely. The user will initiate the two-step recording
+and report its result from the same probe screen.
