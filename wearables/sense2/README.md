@@ -15,7 +15,7 @@ photos; continuous acquisition and watch-to-phone forwarding are not.
 ## Current validation (2026-10-30)
 
 - Watch, companion and settings components build to `build/app.fba`.
-- Forty-three Node tests cover schema validation, delayed/stale readings, future clocks,
+- Forty-five Node tests cover schema validation, delayed/stale readings, future clocks,
   off-wrist/paused state, duplicate heartbeats, retired sessions, stalled delivery,
   opt-in authenticated forwarding, missing watch permissions, missing wear
   detection, failure of wear detection while streaming, and repeated presence
@@ -322,3 +322,21 @@ verifies DIAG 0.1.5, eight timer callbacks over eight seconds, zero HR events on
 the charger, and the idle “Start 60s test” control with its recording notice.
 No exercise was started remotely. The user will initiate the two-step recording
 and report its result from the same probe screen.
+
+### Touch correction 0.1.6
+
+The user reported that neither Start nor Pause responded. The 0.1.5 SVG omitted
+`pointer-events="visible"` on both button backgrounds and text labels; Fitbit
+requires this opt-in for native click events. Version 0.1.6 enables all four
+targets and shows a tap count beside the phone status after a handler runs.
+The prior Node UI mocks called handlers directly, so they could not detect
+disabled native hit testing. A resource regression check now verifies the opt-in,
+and a label-handler test verifies visible tap feedback, wear gating, and the
+separate confirmation press. The 45 tests and FBA build pass. Physical touch and
+the native Exercise API still require a user test on the watch.
+
+Reference: [Fitbit UI events guide](https://dev.fitbit.com/build/guides/user-interface/javascript/#events).
+
+USB installation and launch acknowledged 0.1.6 build `0b414e309bf578a9`.
+A device screenshot verifies the new version and idle controls. No recording
+was started remotely; physical tap verification remains pending.

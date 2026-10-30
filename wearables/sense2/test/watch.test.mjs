@@ -38,6 +38,24 @@ test('requested watch permissions include the body-presence permission',()=>{
  const manifest=JSON.parse(fs.readFileSync(new URL('../package.json',import.meta.url),'utf8'));
  assert.ok(manifest.fitbit.requestedPermissions.includes('access_activity'));
 });
+test('both the button backgrounds and labels opt into native Fitbit touch events',()=>{
+ const view=fs.readFileSync(new URL('../resources/index.view',import.meta.url),'utf8');
+ for(const id of ['toggle','toggle-label','exercise-toggle','exercise-label']){
+  const tag=view.match(new RegExp('<(?:rect|text)\\b[^>]*\\bid="'+id+'"[^>]*>'));
+  assert.ok(tag, 'missing touch target '+id);
+  assert.match(tag[0],/pointer-events="visible"/, 'native touch disabled for '+id);
+ }
+});
+test('label taps give visible feedback without bypassing wear or recording confirmation',()=>{
+ let starts=0;const nativeExercise={state:'stopped',start(){starts++;this.state='started';},stop(){this.state='stopped';}};
+ const h=setup({nativeExercise});
+ h.ui['exercise-label'].events.click();assert.match(h.ui.link.text,/taps 1/);
+ assert.match(h.ui.exercise.text,/Wear watch/);assert.equal(starts,0);
+ h.wear(true);h.ui['toggle-label'].events.click();assert.equal(h.ui.state.text,'paused');
+ h.ui['toggle-label'].events.click();assert.match(h.ui.link.text,/taps 3/);
+ h.ui['exercise-label'].events.click();assert.equal(h.ui['exercise-label'].text,'Confirm recording');assert.equal(starts,0);
+ h.ui['exercise-label'].events.click();assert.equal(starts,1);assert.match(h.ui.link.text,/taps 5/);
+});
 test('missing activity permission shows permission denied without starting sensors',()=>{
  const h=setup({activity:false});assert.equal(h.ui.state.text,'permission denied');assert.equal(h.hr,undefined);
 });

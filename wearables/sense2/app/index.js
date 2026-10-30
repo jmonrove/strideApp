@@ -40,6 +40,7 @@ let hrm = null;
 let hrmRequested = false;
 let body = null;
 let phoneUnavailable = false;
+let buttonTaps = 0;
 const ui = {};
 ['bpm', 'state', 'link', 'count', 'clock', 'raw', 'last', 'runtime', 'wear', 'exercise', 'exercise-toggle', 'exercise-label', 'toggle', 'toggle-label']
   .forEach(id => ui[id] = document.getElementById(id));
@@ -67,10 +68,10 @@ function phoneLabel() {
 }
 function render() {
   const now = new Date();
-  ui.clock.text = 'DIAG 0.1.5  ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+  ui.clock.text = 'DIAG 0.1.6  ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
   ui.bpm.text = status === 'ok' ? String(latestBpm) : '--';
   ui.state.text = status.replace(/_/g, ' ');
-  ui.link.text = phoneLabel();
+  ui.link.text = phoneLabel() + (buttonTaps ? ' / taps ' + buttonTaps : '');
   ui.count.text = eventCount + ' events / ' + uniqueCount + ' unique / ' + validCount + ' valid';
   ui.raw.text = 'raw HR ' + describe(rawBpm) + ' / TS ' + (finiteNumber(rawTimestamp) ? 'number' : describe(rawTimestamp));
   ui.last.text = lastValidAt ? 'last ' + lastValidBpm + ' BPM / ' + Math.max(0, Math.floor((Date.now() - lastValidAt) / 1000)) + 's ago' : 'last valid: none';
@@ -185,7 +186,8 @@ if (!me.permissions.granted('access_heart_rate') || !me.permissions.granted('acc
   startSensor();
 }
 function toggle() {
-  if (!hrm) return;
+  buttonTaps++;
+  if (!hrm) { render(); return; }
   paused = !paused;
   me.appTimeoutEnabled = paused;
   if (paused) { exerciseTest.stop('HR paused'); hrm.stop(); hrmRequested = false; invalidate('paused'); }
@@ -193,6 +195,7 @@ function toggle() {
   publish();
 }
 function testButton() {
+  buttonTaps++;
   const test = exerciseTest.snapshot();
   if (test.owned) exerciseTest.stop('User stopped');
   else if (test.phase === 'armed') exerciseTest.confirm(testInput());
