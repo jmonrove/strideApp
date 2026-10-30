@@ -9,7 +9,8 @@ The official npm beta SDK `@fitbit/sdk@6.2.0-pre.1` includes the `rhea` Sense 2
 build target. The package builds with that SDK using device API 8.2.0 and companion
 API 3.3.0, without proposed APIs. This is
 not a claim that current Sense 2 firmware permits installation or supports every
-sensor API. No live watch reading has been verified yet.
+sensor API. Fresh watch-side BPM is now verified in the user’s diagnostic
+photos; continuous acquisition and watch-to-phone forwarding are not.
 
 ## Current validation (2026-10-30)
 
@@ -35,7 +36,8 @@ sensor API. No live watch reading has been verified yet.
 - The watch component was installed and launched over local USB using the
   unchanged SDK transport and sideload modules. A watch screenshot verifies the
   probe UI, `waiting for wear`, `Phone disconnected`, and zero samples while
-  connected to its charger. A visible running UI is verified; actual BPM is not.
+  connected to its charger. That initial screenshot verified only UI startup. A later wrist test below
+  establishes fresh watch-side BPM.
 - The first device run exposed a missing `access_activity` permission required
   by BodyPresenceSensor. The corrected manifest requests it only for detecting
   wear state; the probe does not read steps, activity history, or daily goals.
@@ -124,6 +126,35 @@ its launch acknowledged over USB. A watch screenshot verifies DIAG 0.1.4, off
 wrist, wear=no, starts=0 and 8 timer ticks over 8 seconds while on its charger.
 This verifies running local callbacks and rendering, not actual BPM or screen-off
 acquisition. The next wrist test and the phone companion remain unresolved.
+
+## Watch-side BPM checkpoint (2026-10-30)
+
+Two user-supplied DIAG 0.1.4 photos verify on-wrist numeric HR with an advancing
+sensor timestamp, a new unique/valid reading, and correct transitions between
+`stale` and `ok`. No biometric values or wrist photos are included in this repo.
+The sensor start count remained one; confirmed wear did not change between the
+photos. Timer callbacks advanced with elapsed wall time rather than stopping
+when the display slept. This establishes watch-side acquisition/rendering and
+stale detection, not sensor accuracy or end-to-end delivery.
+
+The photos' runtime/age counters imply roughly 14 seconds between the two latest
+HR events (rounded counters). Total runtime includes time on the charger, so
+sample count divided by total runtime is not a valid on-wrist sampling-rate
+estimate. A longer measurement is still needed. The requested 1 Hz rate is not
+being treated as a measured delivery guarantee; Fitbit's SensorOptions reference
+explicitly says actual frequency depends on driver/hardware constraints.
+
+The current five-second freshness limit and fresh-history start gate must stay
+unchanged. These sparse observations do not establish an input suitable for
+adaptive motion control. The next comparison is acquisition while an exercise
+session is active, if the firmware permits returning to the probe while it runs.
+Starting an exercise creates an activity record; no exercise has been started
+programmatically or requested automatically by this probe. The Exercise API also
+automatically persists sessions to the Fitbit Activity Log, so testing that API
+requires an explicit user start and the exercise permission.
+
+The display still reports the phone disconnected. SDK OAuth/Gallery installation
+blocks for the companion remain; watch-local BPM is not a verified phone stream.
 
 ## Repeat the local USB watch test
 
@@ -232,6 +263,8 @@ transport and controller verification remain prerequisites for physical adaptati
 ## References
 
 - [Official Appbit timeout reference](https://dev.fitbit.com/build/reference/device-api/appbit/)
+- [Official sensor frequency reference](https://dev.fitbit.com/build/reference/device-api/sensors/)
+- [Official Exercise API reference](https://dev.fitbit.com/build/reference/device-api/exercise/)
 - [Official display reference](https://dev.fitbit.com/build/reference/device-api/display/)
 - [Official heart-rate guide](https://dev.fitbit.com/build/guides/sensors/heart-rate/)
 - [Official permission guide](https://dev.fitbit.com/build/guides/permissions/)
