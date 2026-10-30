@@ -15,7 +15,7 @@ photos; continuous acquisition and watch-to-phone forwarding are not.
 ## Current validation (2026-10-30)
 
 - Watch, companion and settings components build to `build/app.fba`.
-- Forty-five Node tests cover schema validation, delayed/stale readings, future clocks,
+- Forty-eight Node tests cover schema validation, delayed/stale readings, future clocks,
   off-wrist/paused state, duplicate heartbeats, retired sessions, stalled delivery,
   opt-in authenticated forwarding, missing watch permissions, missing wear
   detection, failure of wear detection while streaming, and repeated presence
@@ -166,8 +166,10 @@ a concurrent comparison for this probe.
 Revision 0.1.5 adds an optional exercise session inside the probe using
 `access_exercise`. This is a new permission to create Fitbit Activity Log records;
 the user explicitly approved installation with this permission. Nothing starts at app launch.
-The native exercise module is loaded lazily only after an on-watch Start and
-Confirm sequence while wear is confirmed and HR is unpaused. The confirmation
+In 0.1.5–0.1.6, the native exercise module was loaded only after an on-watch Start
+and Confirm sequence. Revision 0.1.7 also performs a guarded, read-only state
+inspection at launch; starting still requires Start and Confirm while wear is
+confirmed and HR is unpaused. The confirmation
 states that it records a 60-second Treadmill test. GPS and autopause are disabled.
 The Exercise API start/stop behavior, exercise permission at use time, and faster
 cadence have not been verified on the Sense 2 yet. Unsupported modules/permissions leave passive HR usable.
@@ -189,7 +191,7 @@ and cadence test, not an actuation test or a guarantee of continuous data.
 All 43 tests and the FBA build pass, including explicit confirmation/expiry,
 permission gating, foreign-workout protection, native failures, clock changes,
 auto-stop, repeated actions, local HR surviving unsupported APIs, and unload.
-The generated watch script keeps `require("exercise")` inside a lazy function.
+The generated watch script keeps `require("exercise")` inside a guarded loader.
 A separate exercise-test artifact is prepared; the previous passive FBA is
 preserved outside the repo for rollback. No exercise was started by these tests
 on the physical watch; unit tests use a fake native exercise object.
@@ -340,3 +342,22 @@ Reference: [Fitbit UI events guide](https://dev.fitbit.com/build/guides/user-int
 USB installation and launch acknowledged 0.1.6 build `0b414e309bf578a9`.
 A device screenshot verifies the new version and idle controls. No recording
 was started remotely; physical tap verification remains pending.
+
+### Exercise state diagnosis 0.1.7
+
+The user registered six taps in 0.1.6. A screenshot showed the pre-start message
+“Another Fitbit exercise may be active,” but the user confirmed none was active.
+That revision grouped any value other than `stopped` into one message; the exact
+state from that attempt was not captured. Revision 0.1.7 distinguishes a reported
+`started`/`paused` state from an unsupported value and displays the latter's
+primitive value/type. Unknown states still block recording.
+
+A guarded, read-only state inspection now runs at launch and reports metadata
+only to USB logs. It never starts, stops, resumes, or adopts an exercise. After
+the first installation's launch timed out and a fresh launch returned “App not
+installed,” one bounded reinstall succeeded. SDK install and launch acknowledged
+build `0255c9b194333496`; its log reported `exercise state=stopped; valid=true`.
+This confirms the current state, not the cause of the earlier rejection. The
+48 tests cover unknown-state diagnostics and read-only inspection preserving
+confirmation, ownership, passive HR, and foreign-exercise protection. The
+on-watch Start/Confirm recording test is still pending.

@@ -50,6 +50,9 @@ const exerciseTest = createExerciseTest({
   // Deliberately lazy: a missing native module must not break passive HR.
   load: () => require('exercise'),
 });
+// Read state only. This cannot create, resume, or stop an exercise.
+const exerciseInfo = exerciseTest.inspect();
+console.log('HR_PROBE runtime features: exercise state=' + exerciseInfo.state + '; valid=' + exerciseInfo.valid);
 function testInput() { return {onWrist, paused}; }
 function describe(value) {
   if (value === null) return 'null';
@@ -68,7 +71,7 @@ function phoneLabel() {
 }
 function render() {
   const now = new Date();
-  ui.clock.text = 'DIAG 0.1.6  ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+  ui.clock.text = 'DIAG 0.1.7  ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
   ui.bpm.text = status === 'ok' ? String(latestBpm) : '--';
   ui.state.text = status.replace(/_/g, ' ');
   ui.link.text = phoneLabel() + (buttonTaps ? ' / taps ' + buttonTaps : '');
@@ -79,7 +82,7 @@ function render() {
   ui.runtime.text = (display.on ? 'on' : 'off') + ' / wakes ' + wakeCount + ' / ticks ' + ticks + ' / ' + Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) + 's';
   ui['toggle-label'].text = paused ? 'Resume HR' : 'Pause HR';
   const test = exerciseTest.snapshot();
-  ui.exercise.text = test.phase === 'active' ? 'TEST ' + test.remainingSec + 's / ' + test.samples + ' reads / gap ' + test.maxGapSec + 's' : test.message;
+  ui.exercise.text = test.phase === 'active' ? 'TEST ' + test.remainingSec + 's / ' + test.samples + ' reads / gap ' + test.maxGapSec + 's' : test.phase === 'idle' && !exerciseInfo.valid ? 'Exercise state: ' + exerciseInfo.state : test.message;
   ui['exercise-label'].text = test.owned ? 'Stop test' : test.phase === 'armed' ? 'Confirm recording' : 'Start 60s test';
 }
 function frame() {

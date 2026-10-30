@@ -139,13 +139,20 @@ for(const brokenPeer of ['state','bind','send']) {
  });
 }
 
-test('watch test UI never loads/records on boot and requires a second confirmed press',()=>{
+test('watch test UI never records on boot and requires a second confirmed press',()=>{
  let starts=0,stops=0;const nativeExercise={state:'stopped',start(){starts++;this.state='started';},stop(){stops++;this.state='stopped';}};
  const h=setup({nativeExercise});assert.equal(starts,0);h.wear(true);
  h.ui['exercise-toggle'].events.click();assert.equal(starts,0);assert.equal(h.ui['exercise-label'].text,'Confirm recording');
  h.ui['exercise-toggle'].events.click();assert.equal(starts,1);assert.equal(h.ui['exercise-label'].text,'Stop test');
  h.read(120,100);h.tick();assert.match(h.ui.exercise.text,/1 reads/);
  h.ui.toggle.events.click();assert.equal(stops,1);assert.equal(h.ui.state.text,'paused');
+});
+test('read-only startup reports an unknown exercise state without breaking passive HR',()=>{
+ let writes=0;const nativeExercise={state:undefined,start(){writes++;},stop(){writes++;}};
+ const h=setup({nativeExercise});assert.equal(h.ui.exercise.text,'Exercise state: undefined');
+ h.wear(true);h.read(120,100);h.tick();assert.equal(h.ui.state.text,'ok');assert.equal(writes,0);
+ h.ui['exercise-toggle'].events.click();h.ui['exercise-toggle'].events.click();
+ assert.equal(h.ui.exercise.text,'Exercise state: undefined; blocked');assert.equal(writes,0);
 });
 test('denied or unsupported exercise access leaves passive heart-rate readings functional',()=>{
  for(const exercisePermission of [false,true]){

@@ -34,9 +34,24 @@ test('unsupported native exercise API is isolated from passive sensing',()=>{
  h.advance();assert.equal(h.controller.snapshot().owned,false);
 });
 test('an existing started or paused exercise is never changed or stopped',()=>{
- for(const existing of ['started','paused','unknown']){
+ for(const existing of ['started','paused']){
   const h=setup({existing});assert.equal(h.start().phase,'blocked');
   h.controller.stop();h.advance(65000);assert.equal(h.starts,0);assert.equal(h.stops,0);assert.equal(h.api.state,existing);
+ }
+});
+test('unrecognized native states are unsupported, not mislabeled as active exercises',()=>{
+ for(const existing of ['unknown',null,0,{},false]){
+  const h=setup({existing});const result=h.start();assert.equal(result.phase,'unsupported');
+  assert.match(result.message,/Exercise state:/);assert.equal(h.starts,0);assert.equal(h.stops,0);
+ }
+ const h=setup();delete h.api.state;assert.match(h.start().message,/undefined/);assert.equal(h.starts,0);
+});
+test('read-only state inspection never starts, stops, or takes ownership of an exercise',()=>{
+ for(const existing of ['stopped','started','paused',null,0,'unexpected']){
+  const h=setup({existing});const result=h.controller.inspect();
+  assert.equal(result.valid,['stopped','started','paused'].includes(existing));
+  assert.equal(h.starts,0);assert.equal(h.stops,0);assert.equal(h.controller.snapshot().owned,false);
+  assert.equal(h.controller.snapshot().phase,'idle');
  }
 });
 test('confirmed start records a treadmill test without GPS or autopause',()=>{

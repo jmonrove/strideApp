@@ -1,4 +1,4 @@
-// No Fitbit module loads or activity writes occur until an explicit confirmation.
+// Inspection only reads native API metadata; activity writes need confirmation.
 // Only timing/counters are retained here; BPM values never enter this controller.
 export function createExerciseTest(options) {
   let phase = 'idle';
@@ -19,6 +19,23 @@ export function createExerciseTest(options) {
   }
   function changed() { if (options.changed) options.changed(); }
   function allowed(input) { return input && input.onWrist === true && input.paused === false; }
+  function stateLabel(value) {
+    if (value === null) return 'null';
+    if (typeof value === 'string') return value.slice(0, 24);
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return typeof value;
+  }
+  function inspect() {
+    try {
+      if (!options.permission()) return {state:'permission missing', valid:false};
+      const module = options.load();
+      const candidate = module && (module.default || module.exercise || module);
+      if (!candidate || typeof candidate.start !== 'function' || typeof candidate.stop !== 'function')
+        return {state:'API unavailable', valid:false};
+      const state = candidate.state;
+      return {state:stateLabel(state), valid:state === 'stopped' || state === 'started' || state === 'paused'};
+    } catch (_) { return {state:'API read failed', valid:false}; }
+  }
   function snapshot() {
     const elapsed = phase === 'active' ? Math.max(0, lastClock - startedAt) : 0;
     return {phase, message, owned, samples, maxGapSec: Math.ceil(maxGapMs / 1000),
@@ -67,7 +84,12 @@ export function createExerciseTest(options) {
       if (!api || typeof api.start !== 'function' || typeof api.stop !== 'function') throw Error('Unsupported exercise API');
       const existing = api.state;
       if (existing !== 'stopped') {
-        phase = 'blocked'; message = 'Another Fitbit exercise may be active'; changed(); return snapshot();
+        if (existing === 'started' || existing === 'paused') {
+          phase = 'blocked'; message = 'Fitbit exercise ' + existing + '; end it first';
+        } else {
+          phase = 'unsupported'; message = 'Exercise state: ' + stateLabel(existing) + '; blocked';
+        }
+        changed(); return snapshot();
       }
     } catch (_) {
       api = null;
@@ -115,5 +137,5 @@ export function createExerciseTest(options) {
     if (time - startedAt >= 60000 || callbacks >= 60) return stop('Test complete');
     return snapshot();
   }
-  return {snapshot, arm, confirm, reading, tick, stop};
+  return {snapshot, inspect, arm, confirm, reading, tick, stop};
 }
