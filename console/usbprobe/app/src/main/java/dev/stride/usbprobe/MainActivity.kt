@@ -162,6 +162,11 @@ class MainActivity : Activity() {
         }
 
         append("Inventory only. Reading reports is optional and requires the board idle.")
+        val queryButton = Button(this).apply {
+            text = "Identify board / read status (no controls)"
+            setOnClickListener { startActivity(Intent(this@MainActivity, QueryActivity::class.java)) }
+        }
+        (readButton.parent as LinearLayout).addView(queryButton, 2)
         readButton.isEnabled = true
         readButton.setOnClickListener {
             readButton.isEnabled = false

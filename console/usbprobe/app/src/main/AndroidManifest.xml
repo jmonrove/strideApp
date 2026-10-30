@@ -19,14 +19,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Auto-grants USB permission when the board is attached, so the
-                 probe survives a reboot without a permission dialog. -->
-            <intent-filter>
-                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
-            </intent-filter>
-            <meta-data
-                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
-                android:resource="@xml/device_filter" />
         </activity>
+        <activity android:name=".QueryActivity" android:exported="false"
+            android:screenOrientation="landscape" />
     </application>
 </manifest>

@@ -13,8 +13,8 @@ android {
         // Sideloaded on Android 5.1 and 9 consoles; retain the original target
         // so newer USB permission behavior does not change during this port.
         targetSdk = 28
-        versionCode = 1
-        versionName = "0.1-probe"
+        versionCode = 2
+        versionName = "0.2-query-probe"
     }
 
     buildTypes {
@@ -38,6 +38,7 @@ android {
     }
 }
 
-// No dependencies on purpose — plain framework Activity keeps the build fast
-// and the APK tiny. This is a throwaway diagnostic, not the HUD.
-dependencies {}
+// Framework-only runtime; JUnit exercises the isolated query/transport policy.
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+}

@@ -27,8 +27,9 @@ cd ../stride
 ```
 
 Both builds and the checks above pass. APK manifest inspection confirms minimum
-SDK 22; the probe's APK signature verifies for API 22. Neither application has
-yet been installed or run on this console.
+SDK 22; the probe's APK signature verifies for API 22. The USB probe has now been
+installed and its inventory verified on the console. The full STRIDE motor app
+has not been installed or run on this console.
 
 The full app's compatibility lint profile checks NewApi and InlinedApi only.
 Unfiltered lint also reports existing MissingPermission findings in Ftms.kt
@@ -38,8 +39,9 @@ as a full lint pass.
 
 ## Remaining device checks
 
-1. Install and open the probe. Record the USB inventory and WebView version.
-   Do not press its optional input-reader button for the initial inventory.
+1. Validate the probe's restricted identity/capability/status query path. Inventory
+   confirms `213c:0002`, interrupt endpoints `81/02` with 64-byte packets, and
+   WebView 83.0.4103.120. Opening inventory claims no interface.
 2. Check the actual WebView against the app's JavaScript and CSS requirements.
    A successful native build does not validate the HTML user interface.
 3. Confirm the motor-board transport and protocol before using the full app.
@@ -146,6 +148,27 @@ client definitions do not establish that a server is installed, enabled or usabl
 on this firmware. No RPC was invoked and no server was enabled. Some Arda methods
 could not be fully decompiled; its wider activation/control flow remains unverified.
 This is an alternative integration lead, not a working control API on this console.
+
+### Restricted board-read probe
+
+The USB probe now has an isolated query codec and bounded metadata/status plan,
+with 16 passing JVM tests and a passing full lint/build on API 22-compatible code.
+Inventory and the query screen run on the physical console. Android USB permission
+was granted without selecting a default USB handler. A successful live identity
+and status snapshot has not yet been obtained.
+
+The first non-forced claim was refused. Temporarily closing the main iFit app
+did not release the `usbfs` claim; closing Arda did. With the safety key still out,
+the probe then claimed the interface without force. Its first identity query got
+an unexpected command response, and it closed without sending control requests.
+The original diagnostic did not record the reply header, so the reason is unknown.
+The next version includes a bounded input-only drain and header diagnostics.
+
+Linux subsequently reattached `usbhid`, blocking another non-forced claim. An
+unchecked per-run option can permit detachment only when sysfs confirms `usbhid`
+on the sole matching controller; other or unknown owners are rejected. That
+additional mode remains pending an explicitly approved device test. No connect,
+unlock, mode/speed/incline write, calibration, reset or firmware operation was sent.
 
 Next validation should isolate identity/capability/status reads from initialization
 writes, then establish limits, safety-key/start behavior and independent feedback
