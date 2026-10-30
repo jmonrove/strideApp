@@ -451,3 +451,24 @@ The SDK acknowledged 0.1.10 build `00d2b5977e6914a8` after one bounded reinstall
 following the recurring first-launch timeout/“App not installed” behavior. Launch
 and a watch screenshot verify the new idle UI, and the read-only native state is
 `stopped`. The comparison test still requires the user’s on-watch Start/Confirm.
+
+### Completed exercise statistics comparison
+
+The user completed the 0.1.10 test and reconnected USB. The result screenshot
+showed zero eligible sensor readings and a 62-second sensor gap, alongside 53
+valid numerical exercise-HR polls out of 58, 25 value changes, 57 advances of
+native exercise time, and five invalid/error polls. The longest same-value/wait
+interval was seven seconds; this is not an acquisition-gap measurement because
+unchanged BPM can represent new measurements. Start confirmation took one second,
+two native state events were counted, and the result reported `Fitbit stopped`.
+
+This verifies that the native exercise statistics readout updates during a run
+where the separate sensor delivered no eligible readings. It does not explain
+why the sensor channel was silent or establish acquisition timestamps, unique
+measurement count, sensor accuracy, or delivery freshness. Exercise statistics
+remain a separate diagnostic channel and cannot qualify the current adaptive
+controller's input. No freshness limit has been relaxed. The phone companion is
+still uninstalled/disconnected; there is no verified watch-to-phone-to-treadmill
+stream. Further work should address that transport and the exercise-HR freshness
+contract before physical workout adaptation. No further identical sensor-only
+minute tests are needed to establish the limitation seen in these runs.
