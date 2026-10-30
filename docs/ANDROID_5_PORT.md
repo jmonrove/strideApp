@@ -72,3 +72,82 @@ No factory reset, package removal, or motor-control operation has been performed
 Android USB inventory also confirms an ICON Generic HID controller with IDs
 213c:0002 and 64-byte HID interrupt endpoints 0x81 and 0x02. Protocol behavior
 and board identity remain unverified.
+
+## Inspection of installed iFit 2.6.86 (build 4458)
+
+The freshly pulled APK's SHA-256 matched the inspected copy exactly:
+`2a012d40f43de2f2376457265a7c7d7c16ba4dc3cf3b9a40335a63a7ff9943ef`.
+Static inspection unpacked 267 managed assemblies from the Xamarin Android
+assembly store. The relevant layers are `Wolf.Android` (app setup and USB device
+selection), `Shire.Core` (workout playback), `Sindarin.Core` (console abstraction),
+`Sindarin.FitPro1.Core` (board protocol) and `Sindarin.Usb.Android` (USB transport).
+Extracted vendor APKs, assemblies and decompiled source are kept outside this
+repository. They were inspected, not executed or copied into STRIDE.
+
+`WolfUsbDevice` selects vendor ID 8508 (`213c`) and product IDs 2 and 3.
+`UsbProduct` assigns product 2 to FitPro1 and product 3 to FitPro2;
+`PlatformWolfAppSetup.CreateConsole` selects the corresponding factory.
+The observed console controller is `213c:0002`, so the installed app's own
+selection logic identifies it as FitPro1. This is stronger evidence than matching
+the NordicTrack product name, but does not validate live command behavior.
+
+The FitPro1 implementation agrees with STRIDE on command framing, a maximum
+64-byte message, additive checksum, ReadWriteData command 2, and 11 inspected
+field IDs. In particular:
+
+| Field | ID | Encoding / access |
+|---|---:|---|
+| Target speed | 0 | uint16 little endian, km/h multiplied by 100; writable |
+| Target grade | 1 | signed int16 little endian, percent multiplied by 100; writable |
+| Actual speed | 16 | same speed encoding; read only |
+| Actual incline | 17 | same grade encoding; read only |
+| Maximum / minimum grade | 27 / 28 | grade encoding; read only |
+| Maximum / minimum speed | 30 / 31 | speed encoding; read only |
+
+The wire units agree, but quantization differs: iFit's speed/grade converters
+truncate the scaled value toward zero, while STRIDE's general field encoder
+rounds to nearest. Arbitrary fractional inputs can therefore differ by one raw
+unit (0.01 km/h or 0.01% grade); this is not a byte-for-byte equivalence claim.
+
+The remaining matched IDs are workout mode (12), RPM (5), and elapsed time (20).
+`ReadWriteDataCmd` builds sorted write and read masks, waits for a response, and
+updates read fields from the response. Its write-success path also updates the
+local cache with requested values: an acknowledged target is not an independent
+measurement of belt speed or grade. Actual fields must be validated on this board;
+STRIDE's upstream notes describe actual speed returning zero on its author's board.
+
+iFit discovers supported fields/commands and device limits before normal use.
+Its startup includes an unlock exchange for newer software versions and writes
+start-request/idle-lockout settings. The whole initialization routine therefore
+must not be treated as a read-only identification probe. iFit polls selected
+supported fields in a queued loop with a default 100 ms delay after each cycle;
+this is not a guarantee of a 10 Hz effective sample rate. Its exported IPC methods
+examined in the main app cover information and administration, not a ready
+speed/incline API.
+
+The installed app also contains an ActivePulse heart-rate training service. Its
+workout scale checks call a backend service, so the inspected client does not
+establish a complete offline heart-rate control algorithm for reuse.
+
+### Separate Arda package
+
+`com.ifit.arda` 1.0.26 (build 43) was also pulled and its seven DEX files checked
+against the full APK. It includes a Kotlin FitPro1 implementation and generated
+GlassOS gRPC definitions, including:
+
+- ConsoleService: GetConsole, GetConsoleState and state subscriptions.
+- SpeedService: CanRead, CanWrite, GetSpeed, SetSpeed and SpeedSubscription.
+- InclineService: CanRead, CanWrite, GetIncline, SetIncline and InclineSubscription.
+- WorkoutService: StartNewWorkout, Pause, Resume and Stop.
+
+Its inspected gRPC client targets plaintext `localhost:54321`. Read-only inspection
+of the console's IPv4 and IPv6 TCP tables found no listener on that port. Generated
+client definitions do not establish that a server is installed, enabled or usable
+on this firmware. No RPC was invoked and no server was enabled. Some Arda methods
+could not be fully decompiled; its wider activation/control flow remains unverified.
+This is an alternative integration lead, not a working control API on this console.
+
+Next validation should isolate identity/capability/status reads from initialization
+writes, then establish limits, safety-key/start behavior and independent feedback
+before connecting the Lab's proposals to physical actuation. This inspection sent
+no board commands and did not launch the STRIDE motor driver.
