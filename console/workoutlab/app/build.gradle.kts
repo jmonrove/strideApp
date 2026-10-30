@@ -13,8 +13,8 @@ android {
         minSdk = 22
         targetSdk = 28
         testInstrumentationRunner = "android.test.InstrumentationTestRunner"
-        versionCode = 2
-        versionName = "0.2.0-console-preview"
+        versionCode = 3
+        versionName = "0.2.1-console-preview"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

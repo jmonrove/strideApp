@@ -7,6 +7,30 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PreviewServerTest {
+    @Test fun displayEndpointIsAuthenticatedAndCannotQualifyGuidance() {
+        var now = 10_000L
+        val session = LabSession(monotonicNow = { now }, startClock = false)
+        val server = PreviewServer(session, "preview", 0)
+        server.start()
+        fun body(seq: Int) = """{"bpm":120,"pollAgeMs":0,"source":"sense2_exercise","sequence":$seq,"sessionId":"watch-001","status":"display_only","displayOnly":true,"quality":"acquisition_unknown","acquisitionAgeMs":null}"""
+        try {
+            session.selectSensor(WorkoutEngine.Sensor.PHONE)
+            assertEquals(401, request(server.boundPort,"/api/hr-display",body=body(1)).first)
+            for (i in 1..6) {
+                now += 1000
+                assertEquals(200,request(server.boundPort,"/api/hr-display",session.token,body(i)).first)
+            }
+            assertEquals(409,request(server.boundPort,"/api/hr-display",session.token,body(6)).first)
+            assertEquals(400,request(server.boundPort,"/api/hr",session.token,body(7)).first)
+            assertEquals(400,request(server.boundPort,"/api/hr-display",session.token,body(7).replace("\"acquisitionAgeMs\":null","\"acquisitionAgeMs\":0")).first)
+            val state = JSONObject(request(server.boundPort,"/status",session.token).second)
+            assertEquals(120,state.getJSONObject("displayHeartRate").getInt("bpm"))
+            assertFalse(state.getBoolean("heartRateFresh")); assertTrue(state.isNull("heartRateBpm"))
+            assertEquals(409,request(server.boundPort,"/action",session.token,"""{"action":"start","routine":"steady","minutes":20}""").first)
+            now += 6000
+            assertTrue(session.status().getJSONObject("displayHeartRate").isNull("bpm"))
+        } finally {server.close();session.close()}
+    }
     private fun request(port: Int, path: String, token: String? = null, body: String? = null): Pair<Int, String> {
         val connection = URL("http://127.0.0.1:$port$path").openConnection() as HttpURLConnection
         connection.connectTimeout = 2_000; connection.readTimeout = 2_000

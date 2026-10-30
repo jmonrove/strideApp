@@ -15,7 +15,7 @@ photos; continuous acquisition and watch-to-phone forwarding are not.
 ## Current validation (2026-10-30)
 
 - Watch, companion and settings components build to `build/app.fba`.
-- Sixty-two Node tests cover schema validation, delayed/stale readings, future clocks,
+- Sixty-eight Node tests cover schema validation, delayed/stale readings, future clocks,
   off-wrist/paused state, duplicate heartbeats, retired sessions, stalled delivery,
   opt-in authenticated forwarding, missing watch permissions, missing wear
   detection, failure of wear detection while streaming, and repeated presence
@@ -472,3 +472,29 @@ still uninstalled/disconnected; there is no verified watch-to-phone-to-treadmill
 stream. Further work should address that transport and the exercise-HR freshness
 contract before physical workout adaptation. No further identical sensor-only
 minute tests are needed to establish the limitation seen in these runs.
+
+### Display-only phone relay 0.1.11
+
+The prepared 0.1.11 watch component emits an additional `hr_display` frame only
+for on-wrist, active exercise statistics. It carries poll time/age and an explicit
+null acquisition age with `quality=acquisition_unknown` and `displayOnly=true`.
+Its sequence advances only for a new statistics poll or status change, not a
+repeated heartbeat. Stop, pause, unavailable statistics, and wear loss send a
+clearing status. The original timestamped sensor protocol remains separate.
+
+The companion validates this channel independently, acknowledges phone receipt,
+and forwards it only when the existing endpoint/token settings are configured.
+For an endpoint ending in `/api/hr`, the display route is `/api/hr-display`.
+It serializes requests, keeps at most one newest pending display frame, rejects
+old polls/replays/retired sessions, and rounds valid numeric BPM for display.
+No acquisition timestamp is synthesized; polls cannot enter the guidance route.
+Companion logs now omit raw BPM for both channels.
+
+Workout Lab 0.2.1 receives this authenticated endpoint into a separate class
+with no engine reference. It shows the readout on the Sensors screen and phone
+page, labeled display only/acquisition age unknown. Poll expiry blanks it after
+five seconds; replay and inactive statuses cannot freshen old values. Display
+values are excluded from guided-start eligibility and saved session history.
+Sixty-eight watch/relay tests and 36 console JVM tests pass; the APK build and
+Android lint pass. Fitbit Gallery publication/phone installation is still pending.
+The prepared private release requests no additional permissions.

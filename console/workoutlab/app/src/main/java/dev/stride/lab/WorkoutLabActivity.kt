@@ -158,7 +158,7 @@ class WorkoutLabActivity : Activity() {
                 .put("token", session.token).put("running", server != null)
                 .put("error", networkError ?: JSONObject.NULL))
             .put("uiError", error ?: JSONObject.NULL)
-            .put("appVersion", "0.2.0-console-preview")
+            .put("appVersion", "0.2.1-console-preview")
     }
     private fun push(error: String? = null, force: Boolean = false) {
         if (!loaded) return

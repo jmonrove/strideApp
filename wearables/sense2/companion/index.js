@@ -1,6 +1,7 @@
 import * as messaging from 'messaging';
 import { settingsStorage } from 'settings';
 import { inspectFrame, parseSetting, validEndpoint } from '../common/protocol';
+import { createDisplayRelay } from './display-relay.js';
 
 let lastSession = '';
 let lastSequence = 0;
@@ -14,6 +15,8 @@ function tellWatch(data) {
     try { messaging.peerSocket.send(data); } catch (_) {}
   }
 }
+const displayRelay = createDisplayRelay({now:()=>Date.now(),setting:key=>settingsStorage.getItem(key),
+  fetch:(url,options)=>fetch(url,options),ack:tellWatch,log:message=>console.log(message)});
 async function forward() {
   if (inFlight || !pending) return;
   const endpoint = parseSetting(settingsStorage.getItem('endpoint'));
@@ -41,6 +44,7 @@ async function forward() {
 }
 messaging.peerSocket.addEventListener('message', event => {
   const frame = event.data;
+  if (frame && frame.kind === 'hr_display') { displayRelay.receive(frame); return; }
   const checked = inspectFrame(frame, Date.now());
   if (!checked.ok) {
     pending = null;
@@ -63,11 +67,12 @@ messaging.peerSocket.addEventListener('message', event => {
   pending = frame;
   lastStatus = 'ok';
   // Fitbit CLI displays this companion-side line, proving the reading reached the phone.
-  console.log('HR_PROBE ' + JSON.stringify({ bpm: frame.bpm, sequence: frame.sequence, ageMs: checked.sample.ageMs, source: 'sense2' }));
+  console.log('HR_PROBE ' + JSON.stringify({ sequence: frame.sequence, ageMs: checked.sample.ageMs, source: 'sense2' }));
   tellWatch({ kind: 'ack', sequence: frame.sequence });
   forward();
 });
 settingsStorage.addEventListener('change', () => {
+  displayRelay.forward();
   if (latest) pending = latest;
   forward();
 });

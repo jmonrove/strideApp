@@ -1,5 +1,24 @@
 // Transport validation only. These are not exercise targets or a medical assessment.
 export const MAX_SAMPLE_AGE_MS = 5000;
+export function inspectDisplayFrame(frame, nowMs) {
+  if (!frame || frame.kind !== 'hr_display' || frame.version !== 1 || frame.source !== 'sense2_exercise' ||
+      frame.displayOnly !== true || frame.quality !== 'acquisition_unknown' || frame.acquisitionAgeMs !== null)
+    return {ok:false,reason:'invalid_display_frame'};
+  if (typeof frame.sessionId !== 'string' || !/^[A-Za-z0-9_:-]{8,80}$/.test(frame.sessionId) ||
+      !Number.isInteger(frame.sequence) || frame.sequence < 1) return {ok:false,reason:'invalid_sequence'};
+  if (!Number.isFinite(frame.polledAtMs) || frame.polledAtMs < 0 || !Number.isFinite(frame.pollAgeMs) || frame.pollAgeMs < 0)
+    return {ok:false,reason:'invalid_poll_time'};
+  const transit = nowMs - frame.polledAtMs;
+  if (transit < -2000) return {ok:false,reason:'clock_skew'};
+  const pollAgeMs = Math.max(0, transit, frame.pollAgeMs);
+  if (pollAgeMs > 5000) return {ok:false,reason:'stale_poll'};
+  const active = frame.status === 'display_only';
+  if (active ? frame.onWrist !== true || !Number.isFinite(frame.bpm) || frame.bpm < 30 || frame.bpm > 240 :
+      ['inactive','paused','off_wrist','unavailable'].indexOf(frame.status) < 0 || frame.bpm !== null)
+    return {ok:false,reason:'invalid_display_reading'};
+  return {ok:true,sample:{bpm:active ? Math.round(frame.bpm) : null,pollAgeMs,source:'sense2_exercise',sessionId:frame.sessionId,
+    sequence:frame.sequence,status:frame.status,displayOnly:true,acquisitionAgeMs:null,quality:'acquisition_unknown'}};
+}
 export function inspectFrame(frame, nowMs) {
   if (!frame || frame.kind !== 'hr' || frame.version !== 1 || frame.source !== 'sense2') {
     return { ok: false, reason: 'invalid_frame' };

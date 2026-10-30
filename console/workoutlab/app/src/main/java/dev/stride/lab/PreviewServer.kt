@@ -65,6 +65,18 @@ class PreviewServer(private val session: LabSession, private val page: String, v
                     session.action(JSONObject(request.body))
                     reply(socket, 200, session.status().toString())
                 }
+                request.method == "POST" && request.path == "/api/hr-display" -> {
+                    require(request.headers["content-type"]?.substringBefore(';') == "application/json") { "JSON required" }
+                    val body = JSONObject(request.body)
+                    require(body.opt("displayOnly") == true && body.optString("quality") == "acquisition_unknown" &&
+                        body.has("acquisitionAgeMs") && body.isNull("acquisitionAgeMs")) { "Display-only quality required" }
+                    require(body.has("bpm")) { "bpm is required" }
+                    val bpm = if (body.isNull("bpm")) null else integer(body, "bpm", 30, 240).toInt()
+                    val accepted = session.displayHeartRate.accept(bpm, session.now(), integer(body, "sequence", 1, Long.MAX_VALUE),
+                        integer(body, "pollAgeMs", 0, Long.MAX_VALUE), body.getString("source"), body.getString("sessionId"), body.getString("status"))
+                    reply(socket, if (accepted) 200 else 409,
+                        JSONObject().put("accepted", accepted).put("displayOnly", true).toString())
+                }
                 request.method == "POST" && request.path == "/api/hr" -> {
                     require(request.headers["content-type"]?.substringBefore(';') == "application/json") { "JSON required" }
                     val body = JSONObject(request.body)

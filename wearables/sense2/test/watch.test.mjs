@@ -183,6 +183,16 @@ test('native stats polls do not qualify heartbeat frames as fresh sensor reading
  assert.match(h.ui.raw.text,/Sensor: 0 readings/);assert.match(h.ui.last.text,/valid polls/);
  assert.match(h.ui.link.text,/stats untimestamped/);
 });
+test('exercise display frames identify unknown acquisition age and clear after wear loss',()=>{
+ const nativeExercise={state:'stopped',stats:{activeTime:0,heartRate:{current:140}},start(){this.state='started';},stop(){this.state='stopped';}};
+ const h=setup({nativeExercise});h.wear(true);h.ui['exercise-toggle'].events.click();h.ui['exercise-toggle'].events.click();
+ const display=()=>h.sent.filter(f=>f.kind==='hr_display').at(-1);
+ assert.equal(display().bpm,140);assert.equal(display().displayOnly,true);assert.equal(display().acquisitionAgeMs,null);
+ assert.equal(display().quality,'acquisition_unknown');assert.equal(display().source,'sense2_exercise');
+ const first=display().sequence;h.read(120,100);assert.equal(display().sequence,first);
+ h.tick();assert.equal(display().sequence,first+1);assert.equal(h.sent.at(-1).sequence,1);
+ h.wear(false);assert.equal(display().bpm,null);assert.equal(display().status,'off_wrist');assert.equal(display().sequence,first+2);
+});
 test('denied or unsupported exercise access leaves passive heart-rate readings functional',()=>{
  for(const exercisePermission of [false,true]){
   const h=setup({exercisePermission});h.wear(true);

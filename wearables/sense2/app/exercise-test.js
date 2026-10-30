@@ -55,6 +55,7 @@ export function createExerciseTest(options) {
     const elapsed = owned ? Math.max(0, lastClock - startedAt) : 0;
     return {phase, message, owned, samples, failure, nativeState:state, stateEvents, startDelayMs,
       stats:statsDiagnostic ? statsDiagnostic.snapshot(lastClock) : null,
+      displayObservation:statsDiagnostic ? statsDiagnostic.displayObservation() : null,
       maxGapSec:Math.ceil(maxGapMs / 1000),
       remainingSec:owned ? Math.max(0, 60 - Math.floor(elapsed / 1000)) : 0,
       waitSec:phase === 'starting' ? Math.max(0, Math.ceil((startWaitMs - elapsed) / 1000)) : 0};

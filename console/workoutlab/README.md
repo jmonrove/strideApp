@@ -11,7 +11,7 @@ simulated proposals from a real deterministic workout engine, rather than mockup
 values. The separate package `dev.stride.lab` contains no FitPro transport, USB
 permission, motor driver, fan command or boot receiver. The original motor app
 remains in `../stride` pending physical validation. The launcher name is **STRIDE
-Preview**, version **0.2.0-console-preview**.
+Preview**, version **0.2.1-console-preview**.
 
 ## Build and validation
 
@@ -152,3 +152,20 @@ start/ramp/stop semantics, and process/phone failure behavior. User caps must be
 intersected with live board limits. The simulation’s ramp passes below minimum
 moving speed and must never be forwarded blindly as hardware commands. Its Stop
 state is not a claim about physical braking.
+
+## Display-only exercise HR
+
+Version 0.2.1 adds authenticated `POST /api/hr-display` for Sense 2 exercise
+statistics with unknown acquisition age. Its JSON contract requires
+`source: "sense2_exercise"`, `displayOnly: true`, `quality: "acquisition_unknown"`,
+`acquisitionAgeMs: null`, `pollAgeMs`, a positive sequence, session ID, status,
+and integer BPM (or null for inactive/off-wrist/paused/unavailable statuses).
+The receiver's separate display cache has no engine reference, expires old
+polls after five seconds, and rejects replays and retired sessions. It does not
+change the current control sensor, guide a workout, or enter saved HR history.
+The phone page and Sensors screen label it as display only. Neither an accepted
+poll nor a changing BPM establishes acquisition freshness.
+
+Build, 36 JVM tests and full lint pass. Physical display/relay delivery for this
+version remains pending because Wi-Fi ADB did not respond at 192.168.86.64:5555
+and the Fitbit companion has not yet been installed. No motor transport is linked.

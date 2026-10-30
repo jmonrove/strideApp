@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import fs from 'node:fs';
 import { inspectFrame, parseSetting, validEndpoint } from '../common/protocol.js';
+import { createDisplayRelay } from '../companion/display-relay.js';
 const source=fs.readFileSync(new URL('../companion/index.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 function setup({ configured=true, fetchImpl }={}) {
  const callbacks={};const sent=[];const requests=[];const logs=[];let now=1700000000000;
  const stored={endpoint:JSON.stringify({name:'http://lab:8780/api/hr'}),token:JSON.stringify({name:'test-token'})};
  const peerSocket={ OPEN:1,readyState:1,bufferedAmount:0,send:v=>sent.push(v),addEventListener:(k,fn)=>callbacks[k]=fn };
- const context={messaging:{peerSocket},settingsStorage:{getItem:k=>configured?stored[k]:null,addEventListener:()=>{}},inspectFrame,parseSetting,validEndpoint,Number,JSON,Date:{now:()=>now},console:{log:v=>logs.push(v)},setTimeout:()=>1,clearTimeout:()=>{},fetch:async(url,opts)=>{requests.push({url,...opts});return fetchImpl?fetchImpl():{status:200};}};
+ const context={createDisplayRelay,messaging:{peerSocket},settingsStorage:{getItem:k=>configured?stored[k]:null,addEventListener:()=>{}},inspectFrame,parseSetting,validEndpoint,Number,JSON,Date:{now:()=>now},console:{log:v=>logs.push(v)},setTimeout:()=>1,clearTimeout:()=>{},fetch:async(url,opts)=>{requests.push({url,...opts});return fetchImpl?fetchImpl():{status:200};}};
  vm.runInNewContext(source,context);
  const frame=(sequence,sessionId='watch-A')=>({kind:'hr',version:1,source:'sense2',sessionId,sequence,bpm:110,observedAtMs:now,ageMs:0,status:'ok',onWrist:true});
  return {callbacks,sent,requests,logs,frame,advance:ms=>now+=ms};

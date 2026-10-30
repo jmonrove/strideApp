@@ -15,6 +15,7 @@ class LabSession(
     startClock: Boolean = true,
 ) {
     val phoneInput = HeartRateIngress(engine)
+    val displayHeartRate = DisplayHeartRate()
     val token: String = ByteArray(24).also { SecureRandom().nextBytes(it) }
         .joinToString("") { "%02x".format(it) }
     private val clock = Executors.newSingleThreadScheduledExecutor()
@@ -95,6 +96,7 @@ class LabSession(
         return JSONObject()
             .put("previewOnly", true)
             .put("motorConnected", false)
+            .put("displayHeartRate", displayHeartRate.snapshot(now))
             .put("state", view.state.name)
             .put("routine", view.routineId ?: JSONObject.NULL)
             .put("phase", view.phase)

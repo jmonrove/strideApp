@@ -41,6 +41,7 @@ let hrmRequested = false;
 let body = null;
 let phoneUnavailable = false;
 let buttonTaps = 0;
+let displaySequence = 0, displayKey = '', displayPolledAt = 0;
 const ui = {};
 ['bpm', 'state', 'link', 'count', 'clock', 'raw', 'last', 'runtime', 'wear', 'exercise', 'exercise-toggle', 'exercise-label', 'toggle', 'toggle-label']
   .forEach(id => ui[id] = document.getElementById(id));
@@ -71,7 +72,7 @@ function phoneLabel() {
 }
 function render() {
   const now = new Date();
-  ui.clock.text = 'DIAG 0.1.10  ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+  ui.clock.text = 'DIAG 0.1.11  ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
   ui.bpm.text = status === 'ok' ? String(latestBpm) : '--';
   ui.state.text = status.replace(/_/g, ' ');
   ui.link.text = phoneLabel() + (buttonTaps ? ' / taps ' + buttonTaps : '');
@@ -105,6 +106,20 @@ function frame() {
     sentAtMs: Date.now(), ageMs: lastObservedAt ? Math.max(0, Date.now() - lastObservedAt) : 0,
     status, onWrist };
 }
+function displayFrame() {
+  const test = exerciseTest.snapshot(), observation = test.displayObservation;
+  const value = observation && observation.bpm;
+  const displayStatus = onWrist !== true ? 'off_wrist' : paused ? 'paused' : test.phase !== 'active' ? 'inactive' : finiteNumber(value) ? 'display_only' : 'unavailable';
+  const key = displayStatus + ':' + (test.stats ? test.stats.polls : 0);
+  if (key !== displayKey) {
+    displaySequence++; displayKey = key;
+    displayPolledAt = displayStatus === 'display_only' ? observation.polledAtMs : Date.now();
+  }
+  return {kind:'hr_display', version:1, source:'sense2_exercise', sessionId, sequence:displaySequence,
+    bpm:displayStatus === 'display_only' ? value : null, polledAtMs:displayPolledAt,
+    pollAgeMs:Math.max(0, Date.now() - displayPolledAt), acquisitionAgeMs:null,
+    quality:'acquisition_unknown', status:displayStatus, onWrist, displayOnly:true};
+}
 function publish() {
   render();
   if (phoneUnavailable) return;
@@ -113,6 +128,7 @@ function publish() {
   try {
     const peer = messaging.peerSocket;
     if (peer.readyState !== peer.OPEN || peer.bufferedAmount > 1024) return;
+    peer.send(displayFrame());
     peer.send(frame());
   } catch (_) { phoneUnavailable = true; render(); }
 }
