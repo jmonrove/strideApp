@@ -10,7 +10,53 @@ console, start with the [access setup guide and scripts](tools/android5/README.m
 authenticated Wi-Fi ADB and persistent privileged mode, without replacing iFit.
 An experimental [setup APK](console/setup/README.md) packages those steps into
 local toggles, with an optional Termux installer bundle; physical validation is pending.
-The original project's documentation follows.
+
+## What still needs to be done manually
+
+For someone starting with the stock console:
+
+1. **Enter iFit privileged mode once** to reach Android and install the setup APK.
+   The initial challenge/response step is not automated by this project.
+2. **Join a trusted Wi-Fi network and install a trusted build of the setup APK.**
+   Build instructions are in [console/setup](console/setup/README.md); this fork
+   has not published a public binary release. Approve Android's
+   installation/unknown-sources prompt if shown. The upstream motor-app release
+   linked later in this README is a different application.
+3. **Apply the setup actions yourself.** Setup APK 0.1.1 offers an experimental
+   **Enable USB debugging** action, then **Keep privileged mode after reboot** and
+   **Wi-Fi ADB debugging** switches. Each change needs explicit confirmation.
+   The USB action uses a vendor hook with broader debug/console side effects; it
+   has not been physically validated from this APK. If it fails, use Android
+   Developer options; tap About tablet → Build number seven times if necessary,
+   then enable USB debugging manually.
+4. **Connect your computer:** install Android Platform Tools and run
+   `adb connect TABLET_IP:5555`, replacing `TABLET_IP` with the console's current
+   address. On the tablet, approve **Allow USB debugging?** and optionally select
+   **Always allow from this computer**. The app cannot approve a computer for you.
+5. **Approve optional Termux/STRIDE Preview installations.** If direct Wi-Fi setup
+   is denied, the Termux fallback requires opening Termux, pasting the copied
+   script, reviewing it, and pressing Enter.
+6. **Power-cycle the treadmill yourself**, with no workout running and the safety
+   key removed. Run verification and visually check that privileged mode survives
+   without another response code. A marker/property readback alone does not prove
+   a successful reboot or the visible privileged-mode state.
+
+On the development treadmill, privileged mode and authenticated Wi-Fi ADB already
+survived a power cycle using the original commands. The new setup APK still needs
+its own physical test. Persistent privileged mode is distinct from permanent
+Android root, which was not installed. These access steps do not validate motors
+or establish a working Sense 2 → phone → treadmill stream.
+
+See the [complete access instructions and undo steps](tools/android5/README.md),
+[setup APK details](console/setup/README.md), and
+[architecture and decision record](docs/ARCHITECTURE.md).
+
+## Upstream project documentation
+
+The material below is inherited from `keranm/strideApp`. Its first-person account,
+hardware ranges, installation procedure and daily-use claims describe the upstream
+author's system. They are not validation results for this fork's Android 5.1
+console. Our current hardware/evidence record is [here](docs/ANDROID_5_PORT.md).
 
 **Replace the iFit software on a NordicTrack treadmill. Keep the belt, lose the subscription.**
 
