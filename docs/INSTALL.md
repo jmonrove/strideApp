@@ -1,5 +1,11 @@
 # Installing STRIDE
 
+**Android 5.1.1 / part 388129:** use the separate
+[tested access setup guide](../tools/android5/README.md). The older-console route
+keeps iFit installed and does not use this page's factory reset, package removal,
+launcher replacement or `unchain.sh` procedure. Motor control on that board is
+still unvalidated.
+
 > 🚧 **DRAFT.** Nobody has followed this page end to end on a factory-reset
 > machine. [Report anything that does not match](https://github.com/keranm/strideApp/issues).
 

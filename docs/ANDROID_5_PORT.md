@@ -71,6 +71,14 @@ remained in privileged mode. The changed boot ID confirms a new boot;
 persist.adb.tcp.port stayed 5555 while the transient service.adb.tcp.port cleared.
 No factory reset, package removal, or motor-control operation has been performed.
 
+The initial connection used the vendor's existing root-capable adbd configuration;
+after that reboot ADB ran as uid 2000 (shell), not uid 0. No `su` or persistent
+Android root was installed. iFit privileged-mode persistence is independent of
+Android root. A reproducible version-specific guide, guarded bootstrap/host
+helpers, reboot checks and reversal steps are now in
+[tools/android5/README.md](../tools/android5/README.md). The helpers are locally
+tested but have not been rerun on a freshly reset console.
+
 Android USB inventory also confirms an ICON Generic HID controller with IDs
 213c:0002 and 64-byte HID interrupt endpoints 0x81 and 0x02. The later restricted
 query test below validates board identity and read-only FitPro1 communication.

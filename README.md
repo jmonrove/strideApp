@@ -5,7 +5,10 @@ This fork adds an experimental Android 5.1 port and a separate
 phone interface. A [Sense 2 heart-rate probe](wearables/sense2/README.md) is being
 tested as a sensor source. The Lab runs on the older console, but neither live
 Sense 2 streaming nor motor control on that console has been validated. See
-[port status](docs/ANDROID_5_PORT.md). The original project's documentation follows.
+[port status](docs/ANDROID_5_PORT.md). For the tested part 388129 / Android 5.1.1
+console, start with the [access setup guide and scripts](tools/android5/README.md):
+authenticated Wi-Fi ADB and persistent privileged mode, without replacing iFit.
+The original project's documentation follows.
 
 **Replace the iFit software on a NordicTrack treadmill. Keep the belt, lose the subscription.**
 
