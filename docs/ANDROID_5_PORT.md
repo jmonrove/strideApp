@@ -207,8 +207,11 @@ only the documented read queries and did not launch the STRIDE motor driver.
 
 ## Console interface APK (2026-10-30)
 
-The separate `console/workoutlab` app is now STRIDE Preview
-`0.2.0-console-preview` (version code 2, package `dev.stride.lab`, minimum API 22).
+The separate `console/workoutlab` app has STRIDE Preview
+`0.2.1-console-preview` prepared (version code 3, package `dev.stride.lab`, minimum API 22).
+The installed treadmill version is still 0.2.0; the console is currently powered
+off, so 0.2.1 has not been deployed. The new version adds an isolated display-only
+Sense 2 exercise-HR endpoint. It does not make those samples eligible for guidance.
 It implements the approved Home/setup/live/sensors/history/settings screens,
 manual-only sessions, the original-style 400 m oval, an incline profile, and a
 recorded HR chart. The original full STRIDE motor package remains uninstalled.
@@ -223,3 +226,19 @@ The WebView rejects external navigation/requests and has no file/content access.
 This app still has no USB/motor adapter or fan commands. Displayed pace, grade and
 distance are simulated; the selected sensor source is labeled explicitly. The
 physical controller's motion/safety/feedback checks above remain outstanding.
+
+## Isolated manual motor simulator (2026-10-30)
+
+`console/motorbench` now builds a separate `dev.stride.motorbench` APK, version
+`0.1.0-simulator`, minimum API 22. The visible app uses only an in-memory board:
+explicit arming/start, separate mode and speed requests, separate ACK and measured
+values, manual 1 MPH / 2% caps, gradual changes, measured-stop confirmation and
+latched faults. No workout or heart-rate input can actuate it.
+
+The prepared USB class is not instantiated by the activity. Its immutable gate
+rejects all physical writes before transmission, and the controller cannot arm a
+physical link. There is no runtime unlock. 33 JVM tests, APK assembly and lint pass;
+API 22-compatible signing is verified. This has not been installed on the physical
+console, and simulator results do not validate the board's motion feedback,
+startup, actuation or stop semantics. See `console/motorbench/README.md` for the
+operator sequence, limits and remaining physical work.
