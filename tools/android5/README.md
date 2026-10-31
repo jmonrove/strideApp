@@ -17,6 +17,15 @@ marketing name alone is insufficient. The new helpers have local automated tests
 they have **not** been rerun end to end on a freshly reset console. The underlying
 commands and reboot outcome were verified in the original session.
 
+## Optional setup APK
+
+A [native setup APK](../../console/setup/README.md) now packages this workflow
+with privileged-mode persistence and Wi-Fi ADB switches. A compact core build and
+a local bundle with optional Termux/Preview installers are available. The original
+commands were hardware-tested; execution from the new APK's own UID is still
+unvalidated. Initial Android access, debugging and installer/RSA approvals remain
+manual. The scripts below remain the verified underlying route.
+
 ## Tested hardware and software
 
 | Item | Observed value | Evidence |

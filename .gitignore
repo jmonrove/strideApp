@@ -36,3 +36,5 @@ archive/
 # Per-console access baselines contain local addresses and boot identifiers.
 tools/android5/local/
 tools/android5/__pycache__/
+console/*/local/
+console/setup/__pycache__/

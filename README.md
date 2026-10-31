@@ -8,6 +8,8 @@ Sense 2 streaming nor motor control on that console has been validated. See
 [port status](docs/ANDROID_5_PORT.md). For the tested part 388129 / Android 5.1.1
 console, start with the [access setup guide and scripts](tools/android5/README.md):
 authenticated Wi-Fi ADB and persistent privileged mode, without replacing iFit.
+An experimental [setup APK](console/setup/README.md) packages those steps into
+local toggles, with an optional Termux installer bundle; physical validation is pending.
 The original project's documentation follows.
 
 **Replace the iFit software on a NordicTrack treadmill. Keep the belt, lose the subscription.**
