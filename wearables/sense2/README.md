@@ -498,3 +498,19 @@ values are excluded from guided-start eligibility and saved session history.
 Sixty-eight watch/relay tests and 36 console JVM tests pass; the APK build and
 Android lint pass. Fitbit Gallery publication/phone installation is still pending.
 The prepared private release requests no additional permissions.
+
+The user explicitly approved the 0.1.11 rights warranty and private publication.
+The checkbox was accepted and Publish Clockface submitted once. Gallery returned
+`Response not successful: Received status code 400`; the browser console reported
+the same generic ApolloError, without a field-specific validation reason. A later
+read showed the app still in Draft with “Upload a build to make your Clockface
+available.” No published version, private installation link, or installed phone
+companion was established. The package itself remains prepared at build
+`06d7e3bb4592e849`. Browser developer-tool inspection did not yield a response body;
+the root cause of the 400 is unresolved. No blind publication retry was made.
+
+The pinned CLI's phone discovery calls its authenticated Developer Relay API;
+only device discovery adds local USB hosts. No direct phone LAN-host option was
+found in that code. The user was asked whether their phone's Developer Bridge UI
+offers a host/server override before treating that as an available alternate route.
+The treadmill was confirmed powered off, so the 0.2.1 APK has not been installed.
