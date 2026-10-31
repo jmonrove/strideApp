@@ -23,8 +23,9 @@ A [native setup APK](../../console/setup/README.md) now packages this workflow
 with privileged-mode persistence and Wi-Fi ADB switches. A compact core build and
 a local bundle with optional Termux/Preview installers are available. The original
 commands were hardware-tested; execution from the new APK's own UID is still
-unvalidated. Initial Android access, debugging and installer/RSA approvals remain
-manual. The scripts below remain the verified underlying route.
+unvalidated. Initial Android access and installer/RSA approvals remain manual. Version 0.1.1
+also adds an unverified vendor-hook action to enable USB debugging, with manual
+Developer options as the fallback. The scripts below remain the verified underlying route.
 
 ## Tested hardware and software
 
@@ -117,7 +118,10 @@ It does **not** set a TCP port or install `su`.
 In our session `sys.adb.debug` was already 1 when inspected; we did not establish
 that entering this value was required. Treat this as a firmware-specific option,
 not a universal root password or a persistent-root guarantee. Root Grant is a
-local manual action; the scripts do not invoke it or change ADB authentication.
+local manual action; the shell/host scripts do not invoke it or change ADB authentication.
+The optional setup APK 0.1.1 can explicitly request the same system broadcast on
+the exact firmware, with its broader side effects disclosed and a readback check.
+That APK path has not yet been physically validated.
 After any such action, recheck USB debugging before continuing.
 
 ## 2. Install the Android 5 Termux variant

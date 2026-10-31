@@ -26,6 +26,7 @@ class SetupActivity:Activity() {
     private lateinit var status:TextView
     private lateinit var wifi:Switch
     private lateinit var privileged:Switch
+    private lateinit var usbButton:Button
     private val mutationControls=mutableListOf<android.view.View>()
     private var state:JSONObject?=null
     private var busy=false
@@ -40,6 +41,10 @@ class SetupActivity:Activity() {
         val content=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL}
         root.addView(ScrollView(this).apply {addView(content)},LinearLayout.LayoutParams(-1,0,1f))
         details=label("",14f);content.addView(details)
+        usbButton=button(row(content),"Enable USB debugging") {
+            confirm("Enable USB debugging using vendor hook",
+                "This firmware's Root Grant hook requests USB debugging, starts the vendor console service and sets sys.adb.debug=1. It may make adbd run as root for this boot. It does not install permanent root, disable authentication, or approve a computer. Apply once, then verify the result; use Developer options if it is refused.") {setup.usbDebugging()}
+        }
         privileged=toggle(content,"Keep privileged mode after reboot") {checked ->
             confirm(if(checked) "Keep privileged mode" else "Remove setup marker",
                 if(checked) "Create the version-specific marker and request privileged mode now. No packages are disabled. Confirm its effect visually."
@@ -54,7 +59,7 @@ class SetupActivity:Activity() {
                 if(checked)setup.wifi() else setup.disableWifi()
             }
         }
-        content.addView(label("Switches report saved port/marker state. Root is not installed. USB debugging must be enabled in Android settings.",14f))
+        content.addView(label("Switches report saved port/marker state. No permanent root is installed. Enable USB debugging first, then Wi-Fi ADB.",14f))
         val first=row(content)
         button(first,"Inspect / refresh") {refresh()}
         button(first,"Developer options") {startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))}
@@ -140,6 +145,8 @@ class SetupActivity:Activity() {
             "Admin ${s.optString("adminVersion")} (${s.optInt("adminCode")}) · USB debugging ${s.optBoolean("debugging")}\n"+
             "LAN ${s.optString("ipv4")} · app ${s.optString("uid").substringBefore(' ')}\n${s.optString("support")}"
         val supported=s?.optString("support")?.startsWith("Tested profile matches")==true
+        usbButton.isEnabled=!busy && s?.optBoolean("hardwareSupported")==true && !s.optBoolean("debugging")
+        usbButton.text=if(s?.optBoolean("debugging")==true) "USB debugging enabled" else "Enable USB debugging"
         mutationControls.forEach {it.isEnabled=!busy && supported}
         rendering=true
         wifi.isChecked=s?.optJSONObject("properties")?.optString("persist.adb.tcp.port")=="5555"

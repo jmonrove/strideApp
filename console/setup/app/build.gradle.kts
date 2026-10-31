@@ -2,7 +2,7 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 android {
     namespace = "dev.stride.setup"
     compileSdk = 34
-    defaultConfig { applicationId = "dev.stride.setup"; minSdk = 22; targetSdk = 28; versionCode = 1; versionName = "0.1.0" }
+    defaultConfig { applicationId = "dev.stride.setup"; minSdk = 22; targetSdk = 28; versionCode = 2; versionName = "0.1.1" }
     flavorDimensions += "payload"
     productFlavors {
         create("core") { dimension = "payload"; versionNameSuffix = "-core" }

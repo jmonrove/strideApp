@@ -1,8 +1,35 @@
 # STRIDE Console Setup APK
 
 Android 5.1/API 22 setup wizard for the tested Malata NordicTrack 1750 console.
-Package `dev.stride.setup`, version `0.1.0`. It bundles the documented access
+Package `dev.stride.setup`, version `0.1.1`. It bundles the documented access
 procedure into a local native UI. No motor transport or workout driver is present.
+
+## USB debugging bootstrap
+
+Version 0.1.1 adds **Enable USB debugging**. On the exact supported hardware it
+can be selected while USB debugging is off, before enabling the other controls.
+It saves the first baseline and, after an explicit side-effect explanation and
+Apply, sends the inspected `malata.adb.root` broadcast to the Android system
+package. The vendor's receiver starts its `console` service, sets
+`sys.adb.debug=1` and toggles `adb_enabled` off/on; adbd may consequently run as
+root during this boot. It does not install a su binary or permanent root.
+
+This firmware-specific route is **inferred from the extracted Settings/framework
+code and not physically validated from this app**. It is not a standard Android
+permission available to an ordinary installer. The app does not request
+WRITE_SECURE_SETTINGS or try to grant itself permissions. Android normally
+[does not let ordinary apps write Global settings](https://developer.android.com/reference/android/provider/Settings.Global).
+The targeted vendor broadcast could be refused or not delivered; the app must
+observe ADB_ENABLED=1 and retained authentication before reporting the setting
+enabled. It polls at most 40 times with 100 ms between checks. It sends at most
+one request, makes no automatic
+retry, and does nothing if debugging is already on. Transport and computer RSA
+authorization are separate checks. Unknown builds cannot invoke this action.
+
+If it fails, open **Developer options** and enable USB debugging manually. The app
+never automates disabling the USB debugging switch. The Wi-Fi ADB switch controls
+only TCP ports. The vendor hook does not enable hidden Developer options for you;
+use About tablet → Build number when that screen is unavailable.
 
 ## Two switches
 
@@ -23,7 +50,7 @@ Each switch has an explanation and Apply/Cancel dialog. Unknown devices remain
 inspect-only. Before the first change it saves a private first baseline without
 overwriting it. Backup view, Developer options, the full setup guide, and an
 explicit changed-boot verification button are included. It never reboots itself,
-installs root, disables/uninstalls iFit, changes HOME, claims USB or sends board
+installs permanent root, disables/uninstalls iFit, changes HOME, claims USB or sends board
 commands. There is no boot receiver, remote command endpoint or cloud service.
 
 ## What is confirmed and what is pending
@@ -36,16 +63,20 @@ manual first-entry steps and reversal details.
 **This new APK has not been tested on the physical treadmill.** It executes fixed
 system commands from its own app UID. Firmware permissions may differ from
 Termux's UID, so successful execution there does not establish that this APK can
-write the same properties. A denied write stops without escalation or retry.
+write the same properties. A denied port write stops without an automatic escalation or retry. The separate
+vendor debugging action requires its own explicit confirmation.
 Compatibility requires all of:
 
 - model `MalataSamsungRoyalWolfSinglePartition`, incremental build `MGRSP_20210806`;
-- Android API 22, secure ADB `ro.adb.secure=1`, USB debugging manually enabled;
+- Android API 22 and secure ADB `ro.adb.secure=1`;
+- USB debugging enabled before Wi-Fi/privileged-mode operations (the USB
+  bootstrap itself permits it to be off);
 - iFit Admin package version **2.2.20**, version code **1602**.
 
-Initial iFit privileged-mode entry/challenge response, enabling USB debugging,
-Android installer approval, and the computer RSA approval still require you.
-The vendor Root Grant screen is documented but never invoked by this app.
+Initial iFit privileged-mode entry/challenge response, Android installer approval
+and computer RSA approval still require you. Manual USB debugging is the fallback
+when the optional vendor enable action cannot be verified. The app does not open
+or type the Root Grant password dialog; it requests the same inspected system hook.
 Persistent iFit privileged mode is not permanent Android root.
 
 ## Core and bundle
@@ -130,13 +161,15 @@ If the device refuses a step, preserve the exact message and do not bypass guard
 
 ## Validation
 
-Both variants assemble and lint with zero errors. Twelve JVM policy tests cover
+Both variants assemble and lint with zero errors. Seventeen JVM policy tests cover
 version/authentication/manual-debugging guards, marker ownership/symlinks, reboot
-requirements, port readback before restart, and clearing the port before restart.
+requirements, port readback before restart, and clearing the port before restart. USB tests additionally cover starting with
+debugging off, an already-enabled no-op, one-request timeout, unknown hardware
+rejection, and authentication checks before/after the vendor request.
 The host/shell helper suite remains separate. Signature verification targets API 22.
 
-No physical setup mutation or third-party installation has been performed from
-this APK. Emulator UI inspection verifies rendering/inspect-only behavior on an
+No physical setup mutation, vendor hook invocation or third-party installation
+has been performed from this APK. Emulator UI inspection verifies rendering/inspect-only behavior on an
 unsupported API, not Android 5 property permissions or the device installer flow.
 
 Removing the setup app does not undo the external marker or persistent ADB

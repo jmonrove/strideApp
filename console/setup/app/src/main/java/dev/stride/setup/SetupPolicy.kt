@@ -1,13 +1,31 @@
 package dev.stride.setup
 
-/** No root escalation, USB transport, motor commands or arbitrary shell input. */
+/** Fixed vendor setup actions only; no USB transport, motor commands or arbitrary shell input. */
 object SetupPolicy {
     data class Profile(val model:String,val build:String,val api:Int,val secure:String,val adminVersion:String,val adminCode:Int,val debugging:Boolean)
-    fun check(p:Profile) {
+    fun checkHardware(p:Profile) {
         require(p.model=="MalataSamsungRoyalWolfSinglePartition" && p.build=="MGRSP_20210806" && p.api==22) { "Unsupported tablet build; setup is locked" }
         require(p.adminVersion=="2.2.20" && p.adminCode==1602) { "Unsupported iFit Admin; setup is locked" }
         require(p.secure=="1") { "ADB authentication must remain enabled" }
+    }
+    fun check(p:Profile) {
+        checkHardware(p)
         require(p.debugging) { "Enable USB debugging in Android Developer options first" }
+    }
+    const val vendorDebugAction="malata.adb.root"
+    fun enableUsb(p:Profile,send:()->Unit,enabled:()->Boolean,secure:()->String,pause:()->Unit):Boolean {
+        checkHardware(p)
+        check(secure()=="1") {"ADB authentication state changed; stopped"}
+        if(enabled()) return false
+        send() // One request, never a retry loop. The inspected receiver sleeps for one second.
+        repeat(40) {
+            if(enabled()) {
+                check(secure()=="1") {"Unexpected ADB authentication state; inspect manually"}
+                return true
+            }
+            pause()
+        }
+        error("USB debugging was not confirmed. No automatic retry; use Android Developer options")
     }
     val enableWifi=listOf(listOf("/system/bin/setprop","persist.adb.tcp.port","5555"),
         listOf("/system/bin/setprop","service.adb.tcp.port","5555"))

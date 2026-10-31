@@ -1,6 +1,7 @@
 package dev.stride.setup
 
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import org.json.JSONObject
@@ -40,11 +41,12 @@ class DeviceSetup(private val context:Context) {
             while(ips.hasMoreElements()) {val ip=ips.nextElement();if(!ip.isLoopbackAddress && ip is java.net.Inet4Address) addresses.add(ip.hostAddress ?: "")}
         }} catch(_:Exception) {}
         result.put("ipv4",addresses.joinToString(", "));result.put("hasBackup",backup.exists())
+        result.put("hardwareSupported",try {SetupPolicy.checkHardware(p);true} catch(_:Exception) {false})
         result.put("support",try {SetupPolicy.check(p);"Tested profile matches; this new app UID is not yet hardware validated"} catch(e:Exception) {e.message})
         return result
     }
-    private fun prepare():JSONObject {
-        SetupPolicy.check(profile())
+    private fun prepare(requireDebugging:Boolean=true):JSONObject {
+        if(requireDebugging) SetupPolicy.check(profile()) else SetupPolicy.checkHardware(profile())
         val state=inspect()
         val m=state.getJSONObject("markers")
         require(listOf(SetupPolicy.marker,SetupPolicy.marker+"/keepme").all {m.getString(it) in setOf("absent","directory")}) {"Marker path unsafe; inspect manually"}
@@ -55,6 +57,17 @@ class DeviceSetup(private val context:Context) {
         val original=JSONObject(backup.readText())
         require(original.getString("model")==Build.MODEL && original.getString("build")==Build.VERSION.INCREMENTAL && original.getInt("api")==22) {"Baseline does not match this device"}
         return original
+    }
+    fun usbDebugging():String {
+        val p=profile();SetupPolicy.checkHardware(p)
+        if(p.debugging) return "USB debugging is already enabled; no vendor request sent."
+        prepare(requireDebugging=false)
+        val changed=SetupPolicy.enableUsb(p,
+            {context.sendBroadcast(Intent(SetupPolicy.vendorDebugAction).setPackage("android"))},
+            {Settings.Global.getInt(context.contentResolver,Settings.Global.ADB_ENABLED,0)==1},
+            {prop("ro.adb.secure")},{Thread.sleep(100)})
+        return if(changed) "USB debugging setting verified enabled; authentication remains on. The vendor hook also requests its console/debug mode. Computer approval and transport still need checking."
+            else "USB debugging was already enabled; no vendor request sent."
     }
     fun wifi():String {
         prepare()

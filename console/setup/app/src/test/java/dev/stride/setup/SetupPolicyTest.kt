@@ -64,4 +64,33 @@ class SetupPolicyTest {
         try {SetupPolicy.clearWifi({calls.add(it);""},{"5555"});fail("Expected failure")} catch(_:IllegalStateException) {}
         assertFalse(calls.contains(SetupPolicy.restart))
     }
+    @Test fun usbEnableCanBootstrapWhenDebuggingIsOff() {
+        val off=supported.copy(debugging=false);SetupPolicy.checkHardware(off)
+        var sends=0;var polls=0;var pauses=0
+        assertTrue(SetupPolicy.enableUsb(off,{sends++},{polls++>=3},{"1"},{pauses++}))
+        assertEquals(1,sends);assertTrue(pauses>0)
+    }
+    @Test fun usbAlreadyEnabledSendsNoVendorRequest() {
+        var sends=0
+        assertFalse(SetupPolicy.enableUsb(supported,{sends++},{true},{"1"},{fail("Should not wait")}))
+        assertEquals(0,sends)
+    }
+    @Test fun usbTimeoutNeverRepeatsTheVendorRequest() {
+        var sends=0;var pauses=0
+        try {SetupPolicy.enableUsb(supported.copy(debugging=false),{sends++},{false},{"1"},{pauses++});fail("Expected timeout")} catch(_:IllegalStateException) {}
+        assertEquals(1,sends);assertEquals(40,pauses)
+    }
+    @Test fun usbActionRejectsUnknownHardwareBeforeSending() {
+        var sends=0
+        reject {SetupPolicy.enableUsb(supported.copy(model="other",debugging=false),{sends++},{false},{"1"},{})}
+        assertEquals(0,sends)
+    }
+    @Test fun usbActionNeverBypassesAuthentication() {
+        var sends=0
+        try {SetupPolicy.enableUsb(supported,{sends++},{false},{"0"},{});fail("Expected authentication guard")} catch(_:IllegalStateException) {}
+        assertEquals(0,sends)
+        var secureReads=0;var enabledReads=0
+        try {SetupPolicy.enableUsb(supported.copy(debugging=false),{sends++},{enabledReads++>0},{if(secureReads++==0) "1" else "0"},{});fail("Expected post-check failure")} catch(_:IllegalStateException) {}
+        assertEquals(1,sends)
+    }
 }
