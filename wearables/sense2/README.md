@@ -514,3 +514,13 @@ only device discovery adds local USB hosts. No direct phone LAN-host option was
 found in that code. The user was asked whether their phone's Developer Bridge UI
 offers a host/server override before treating that as an available alternate route.
 The treadmill was confirmed powered off, so the 0.2.1 APK has not been installed.
+
+The user found the phone Developer Bridge had switched off, enabled it again,
+and reported “Waiting for Studio.” A new SDK host-discovery call still failed
+because no SDK auth token was stored. A fresh official SDK authorization-code
+flow (original client, profile scope, state and PKCE checks) redirected from the
+SDK authorization endpoint to Fitbit's web authorization endpoint and visibly
+returned `403 Forbidden` before login/consent. No callback or SDK token was
+obtained; the temporary login listener was stopped. The enabled phone bridge
+does not resolve this Mac-side authentication block. No further phone toggle or
+identical watch sampling test is needed to establish that result.
