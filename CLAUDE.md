@@ -87,14 +87,17 @@ Fork status is quoted in several places, and a change that moves it must update 
 same change:
 
 - **New device or watch evidence** (or a failed attempt) → the module README's validation section,
-  the validation snapshot in `docs/architecture.md`, and `docs/ANDROID_5_PORT.md` if it concerns the
-  port. Date the entry. The evidence file goes to `../artifacts/`.
-- **Changed a `versionName` / `versionCode`** → the module README and the components table in
+  the validation snapshot in `docs/architecture.md`, the status column and diagram colors in
+  `README.md`, and `docs/ANDROID_5_PORT.md` if it concerns the port. Date the entry. The evidence
+  file goes to `../artifacts/`.
+- **Finished, reordered or added a next step** → "Next steps" in `README.md` and the next gates in
   `docs/architecture.md`.
+- **Changed a `versionName` / `versionCode`** → the module README, the components table in
+  `docs/architecture.md`, and the inventory table in `README.md`.
 - **Changed a manual setup step** → "What still needs to be done manually" in `README.md`,
   `tools/android5/README.md` and `console/setup/README.md`.
-- **Added or removed tests** → the test count quoted in the module README and in the validation
-  snapshot.
+- **Added or removed tests** → the test count quoted in the module README, in the validation
+  snapshot, and in `README.md`'s inventory.
 
 ## Local environment
 

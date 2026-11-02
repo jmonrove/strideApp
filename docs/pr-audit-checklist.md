@@ -93,6 +93,9 @@ is still stale until that edit is actually in the diff.
       decision record, or validation snapshot changed
 - [ ] **`README.md` → "What still needs to be done manually"**: a manual setup step was added,
       removed or automated
+- [ ] **`README.md` → inventory, diagram and "Next steps"**: a component's version, test count or
+      status changed, an arrow in the diagram became proven or blocked, or a next step was finished
+      or reordered
 - [ ] **`tools/android5/README.md` / `console/setup/README.md`**: an access command, compatibility
       guard (model, build, Admin version) or undo step changed
 - [ ] **`docs/ANDROID_5_PORT.md`**: new port or board evidence. Add a dated section; don't rewrite

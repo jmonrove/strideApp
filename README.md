@@ -1,15 +1,117 @@
 # STRIDE
 
-This fork adds an experimental Android 5.1 port and a separate
-[Workout Lab](console/workoutlab/README.md) with four simulated routines and a
-phone interface. A [Sense 2 heart-rate probe](wearables/sense2/README.md) is being
-tested as a sensor source. The Lab runs on the older console, but neither live
-Sense 2 streaming nor motor control on that console has been validated. See
-[port status](docs/ANDROID_5_PORT.md). For the tested part 388129 / Android 5.1.1
-console, start with the [access setup guide and scripts](tools/android5/README.md):
-authenticated Wi-Fi ADB and persistent privileged mode, without replacing iFit.
-An experimental [setup APK](console/setup/README.md) packages those steps into
-local toggles, with an optional Termux installer bundle; physical validation is pending.
+This fork runs STRIDE on an older NordicTrack console (Android 5.1) and works toward walks that
+adapt to your heart rate, read from a Fitbit Sense 2. Today you can reach and configure the console
+without replacing iFit, run the workout screens in simulation, and read the motor board without
+driving it.
+
+> **Nothing in this fork moves the belt or deck yet.** Motor control and live heart rate from the
+> watch are both unproven on this console, and the code keeps them disconnected until they are.
+
+**Jump to:** [What's in this repo](#whats-in-this-repo) ·
+[How it fits together](#how-it-fits-together) · [Next steps](#next-steps) ·
+[Manual setup](#what-still-needs-to-be-done-manually) ·
+[Upstream README](#upstream-project-documentation)
+
+## What's in this repo
+
+**Status key:** ✅ verified on the real hardware · 🧪 built and tested, not yet on the hardware ·
+⏸️ blocked · 🔒 locked on purpose · 📦 inherited from upstream, not used on this console
+
+| Part | What it does | Status |
+|---|---|---|
+| [`console/workoutlab`](console/workoutlab/README.md)<br>STRIDE Preview 0.2.1 | The console app. It has four guided routines plus a manual walk; a 400 m oval, incline profile and heart-rate chart; saved history; and a phone page over Wi-Fi. Speed and incline are simulated, and it has no motor code. | ✅ 0.2.0 runs on the console in simulation<br>🧪 0.2.1 built (36 tests), not installed yet |
+| [`console/usbprobe`](console/usbprobe/README.md)<br>USB probe 0.2 | Asks the motor board what it is, its speed and incline limits, and its current status. It sends read-only queries. | ✅ identity, limits and status read on the console (17 tests) |
+| [`console/motorbench`](console/motorbench/README.md)<br>Motor bench 0.1.0 | A manual motor controller wired to a simulated board, for developing motor logic with no treadmill involved. | 🔒 real motor writes are blocked in code<br>🧪 33 tests, run on an emulator |
+| [`console/setup`](console/setup/README.md)<br>Setup app 0.1.1 | An on-console wizard: keep privileged mode after a reboot, turn Wi-Fi ADB on or off, an optional USB-debugging action, optional installers. | 🧪 built (17 tests), not yet tried on the console |
+| [`tools/android5`](tools/android5/README.md) | Computer-side scripts that set up, check and undo console access over ADB. | ✅ the access steps survived a real power cycle<br>🧪 the scripts (20 tests) not rerun on a freshly reset console |
+| [`wearables/sense2`](wearables/sense2/README.md)<br>HR Probe 0.1.11 | A Sense 2 watch face that reads heart rate, plus the Fitbit phone companion that forwards it. | ✅ watch app runs on the wrist (0.1.10), but readings arrive too sparsely to steer a workout<br>⏸️ phone companion blocked by Fitbit sign-in and publishing errors (68 tests) |
+| [`console/stride`](CONTRIBUTING.md)<br>STRIDE 0.8.0 | The full upstream app: motor control, five screen designs, Bluetooth FTMS, Home Assistant. | 📦 builds for Android 5, not installed on this console |
+| `homeassistant/` · `protocol/` · `tools/unchain.sh` | Upstream extras: Home Assistant scripts, the decoded FitPro protocol, and the iFit removal script. | 📦 kept for reference; `unchain.sh` is not used on this console |
+| [`docs/`](docs/README.md) · [`CLAUDE.md`](CLAUDE.md) | The architecture and decision record, the Android 5 port log, coding standards, deploy and verify runbooks, and rules for coding agents. | |
+
+**Tested on one machine:**
+
+| | |
+|---|---|
+| Treadmill | NordicTrack Commercial 1750, console part 388129 |
+| Console | Android 5.1.1 (API 22), 800×480 screen, WebView 83 |
+| Motor board | FitPro1 over USB `213c:0002`, model 14116 |
+| Watch / phone | Fitbit Sense 2 / Pixel 10 XL |
+
+## How it fits together
+
+```mermaid
+flowchart LR
+    computer["💻 Computer<br/>tools/android5 + adb"]
+    subgraph watch["⌚ Fitbit Sense 2"]
+        hrprobe["STRIDE HR Probe<br/>wearables/sense2"]
+    end
+    subgraph phone["📱 Phone"]
+        companion["Fitbit companion<br/>not installed"]
+        page["Browser page<br/>pair · start · stop"]
+    end
+    subgraph console["🖥️ Console · Android 5.1"]
+        access["Wi-Fi ADB + privileged mode<br/>kept across reboots"]
+        setup["Setup app<br/>console/setup"]
+        lab["STRIDE Preview<br/>console/workoutlab"]
+        engine["Workout engine<br/>simulated speed + incline"]
+        usbprobe["USB probe<br/>console/usbprobe"]
+        bench["Motor bench<br/>console/motorbench"]
+        stride["Full STRIDE app<br/>console/stride"]
+    end
+    board[("FitPro motor board<br/>belt + incline deck")]
+
+    computer -- "sets up · installs" --> access
+    setup -. "same switches on the console · untested" .-> access
+    hrprobe -. "heart rate · blocked" .-> companion
+    companion -. "POST /api/hr · unproven" .-> lab
+    page -- "Wi-Fi · paired token" --> lab
+    lab --> engine
+    usbprobe -- "read-only queries" --> board
+    bench -. "🔒 motor writes locked" .-x board
+    stride -. "motor control · not installed" .-> board
+
+    classDef verified fill:#d3f9d8,stroke:#2b8a3e,color:#111
+    classDef built fill:#dbe4ff,stroke:#3b5bdb,color:#111
+    classDef blocked fill:#ffe8cc,stroke:#e8590c,color:#111
+    classDef inherited fill:#f1f3f5,stroke:#868e96,color:#555,stroke-dasharray:4 3
+    classDef hardware fill:#fff3bf,stroke:#f08c00,color:#111
+    class hrprobe,access,lab,engine,usbprobe verified
+    class page,setup,bench built
+    class companion blocked
+    class stride inherited
+    class board hardware
+```
+
+**Reading the diagram:** green means verified on the hardware, blue means built but not proven
+there, orange means blocked, and grey means inherited and not installed. Solid arrows work today.
+Dashed arrows are built but unproven, blocked, or (✕) locked off on purpose.
+
+- **Kotlin owns the machine and HTML owns the screen.** The workout engine runs natively and the
+  console and phone screens only send it validated actions. The engine itself runs in simulation:
+  it has no connection to the board.
+- **Heart rate has two separate channels.** Timestamped readings (`/api/hr`) may one day guide a
+  workout. The watch's exercise statistics (`/api/hr-display`) are display-only, because their age
+  is unknown.
+- **Each console app is its own package.** No live motor service connects the apps, so working on
+  the screens, sensors or setup can't accidentally start the motor driver.
+
+The full map, including trust boundaries and the decision record (D01–D14), is in
+[docs/architecture.md](docs/architecture.md).
+
+## Next steps
+
+The watch path and the motor path don't depend on each other, so they can move in parallel.
+Anything that touches the treadmill needs someone standing at it.
+
+| # | Next step | Why | Needs |
+|---|---|---|---|
+| 1 | Install Preview 0.2.1 on the console and check it on the real screen | The console still runs 0.2.0 | Console powered on |
+| 2 | Try the setup app on the console one switch at a time, then re-check after a power cycle | Proves access can be set up without a computer doing it | You at the console |
+| 3 | Get the Fitbit phone companion installed, then prove heart rate reaches the console from watch through phone, including when it goes stale or disconnects | Live heart rate is the input for adaptive walks | A fix for the Fitbit sign-in and publishing errors |
+| 4 | With someone present and the safety key out: board reads from a cold start and exclusive USB ownership. Then real speed, incline, safety-key and stop behavior. Only then a separately reviewed build with bounded manual motor control | Nothing should drive the belt until its feedback and stops are proven | You at the treadmill |
+| 5 | Only after 3 and 4: design how workouts drive the real motor, with limits, interlocks and a reviewed fail-safe | Heart-rate-driven motion stays disconnected until both sides are trustworthy | Steps 3 and 4 done |
 
 ## What still needs to be done manually
 
@@ -47,9 +149,16 @@ its own physical test. Persistent privileged mode is distinct from permanent
 Android root, which was not installed. These access steps do not validate motors
 or establish a working Sense 2 → phone → treadmill stream.
 
-See the [complete access instructions and undo steps](tools/android5/README.md),
-[setup APK details](console/setup/README.md), and
-[architecture and decision record](docs/architecture.md).
+## Where to read more
+
+| If you want… | Read |
+|---|---|
+| Complete access instructions and undo steps | [tools/android5/README.md](tools/android5/README.md) |
+| Setup app details | [console/setup/README.md](console/setup/README.md) |
+| Architecture, decisions and the validation snapshot | [docs/architecture.md](docs/architecture.md) |
+| The Android 5 port log: ADB, iFit and board-query findings | [docs/ANDROID_5_PORT.md](docs/ANDROID_5_PORT.md) |
+| Rules for coding agents, and every other doc | [CLAUDE.md](CLAUDE.md) · [docs/README.md](docs/README.md) |
+| Safety, before touching anything that moves the belt | [SAFETY.md](SAFETY.md) |
 
 ## Upstream project documentation
 
