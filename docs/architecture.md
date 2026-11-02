@@ -2,7 +2,8 @@
 
 The system map. Rules for agents live in [`../CLAUDE.md`](../CLAUDE.md); this file is knowledge.
 
-Snapshot: **2026-10-30**, branch `android-5-compat`. This document describes what
+Snapshot: **2026-10-30**, with the heart-rate source updated **2026-11-02** (D15, D16), branch
+`android-5-compat`. This document describes what
 exists, its provenance, and the boundaries intentionally retained while validating
 one older console. It is not an assertion that the full adaptive treadmill system
 is operational. Module READMEs and tests contain detailed contracts; update this
@@ -11,11 +12,15 @@ snapshot when a component crosses a hardware-validation boundary.
 ## Goal and current outcome
 
 The intended system runs three or four repeatable workouts on the treadmill,
-shows the original STRIDE-style track/profile visualizations, obtains heart rate
-from a Fitbit Sense 2 paired to an Android phone, and eventually modulates speed
-and incline within explicit user/board limits. The development phone is a Pixel
-10 XL. The current implementation uses heart rate only; it does not implement a
-clinical assessment or a general feed of every watch vital.
+shows the original STRIDE-style track/profile visualizations, obtains live heart
+rate, and eventually modulates speed and incline within explicit user/board limits.
+The heart-rate source was planned as a Fitbit Sense 2 relayed through the development
+phone, a Pixel 10 XL. That route closed on 2026-11-02, when Fitbit turned off the SDK
+sign-in that its phone companion needs. The candidate source is now the treadmill's
+own pulse input, and the Sense 2 is an on-wrist display only (D15). Its probe was
+then removed from the repository (D16). The current
+implementation uses heart rate only; it does not implement a clinical assessment or
+a general feed of every watch vital.
 
 Today the console preview, access tools, read-only board diagnostics and watch
 probe exist independently. Physical motor control and the complete wireless
@@ -29,7 +34,7 @@ current guidance contract.
 |---|---|---|
 | [keranm/strideApp](https://github.com/keranm/strideApp) | Original Kotlin/Android STRIDE app, UI assets, FitPro work, USB probe, Bluetooth FTMS and optional Home Assistant tooling | Forked as [jmonrove/strideApp](https://github.com/jmonrove/strideApp); retained upstream code and attribution, made Android 5 compatibility changes, and added isolated modules |
 | Console's installed iFit, Admin, Settings/framework and Arda packages | Evidence of device selection, FitPro1 encoding, debugging/privileged-mode mechanisms and possible IPC paths | Extracted from the owner's console and inspected locally; findings documented, vendor binaries/decompiled code kept outside the repository |
-| Official Fitbit SDK/tooling | Watch APIs, phone-companion messaging/settings and local USB installation primitives | Pinned versions; diagnostic watch/companion code built in this fork; USB helper uses SDK transport rather than an invented device protocol |
+| Official Fitbit SDK/tooling | Watch APIs, phone-companion messaging/settings and local USB installation primitives | Pinned versions; diagnostic watch/companion code built in this fork; USB helper uses SDK transport rather than an invented device protocol; removed 2026-11-02 (D16) |
 | [Official Termux release](https://github.com/termux/termux-app/releases/tag/v0.119.0-beta.3) | Android 5 terminal used for the original bootstrap | Optional unchanged installer payload; not a library, root package or prerequisite of the native setup path |
 | Original hardware session and local tests | Runtime capabilities, device/board identity, root-versus-privileged distinction, HR cadence limitations | Used to accept/reject integration routes and define explicit validation gates |
 
@@ -57,7 +62,7 @@ unit tests and emulator rendering are kept distinct from device evidence.
 | Read-only board identity | FitPro1 device address 4; model 14116, part 388129; software 82, hardware 1, master library 82.55 |
 | Reported limits | 0.8–19.31 km/h; −3–15% grade; stationary key-out snapshot only |
 | Watch | Sense 2 / `rhea`, firmware 60.20001.220.31, reported API maximum 10.1.0, 336×336 |
-| Development tools | Separate Gradle roots using SDK 34, min API 22 / target 28; JDK 17 or 21; pinned Fitbit SDK 6.2.0-pre.1 and CLI 1.8.0-pre.10 |
+| Development tools | Separate Gradle roots using SDK 34, min API 22 / target 28; JDK 17 or 21. The Fitbit SDK (6.2.0-pre.1, CLI 1.8.0-pre.10) was used until D16 |
 
 These are an exact test profile, not a compatibility matrix for all products
 called “1750.” The external full-size USB port did not enumerate the tablet for
@@ -72,7 +77,6 @@ Detailed evidence is in [ANDROID_5_PORT.md](ANDROID_5_PORT.md) and the
 | Console apps | Kotlin 1.9.24, Android Gradle Plugin 8.5.2, Gradle 8.9 wrapper (one wrapper per app); compileSdk 34, minSdk 22, targetSdk 28; JVM target 17. Framework APIs only (no AndroidX); JUnit 4.13.2 for JVM tests |
 | Console UI | HTML/CSS/JS bundled as APK assets in a WebView (Chromium 83 on the target). The Lab serves the same state to a phone page over LAN HTTP on port 8780 |
 | Upstream integrations (`console/stride`) | FitPro USB HID transport, Bluetooth LE FTMS peripheral (telemetry only), Eclipse Paho MQTT 1.2.5 with Home Assistant MQTT discovery |
-| Watch | Fitbit SDK 6.2.0-pre.1 / CLI 1.8.0-pre.10 (pinned), build target `rhea` (Sense 2); watch app, phone companion, settings; Node's built-in test runner |
 | Host tooling | Python 3.8+ standard library (`tools/android5`, `protocol/`, `console/setup` staging); POSIX shell; Android Platform Tools (`adb`) |
 | Home Assistant side | Python scripts plus `packages/stride.yaml`, configured by `homeassistant/stride.conf` (inherited, not validated in this fork) |
 | Datastores | None. App-private storage on the console; HA entities over MQTT |
@@ -87,7 +91,6 @@ strideApp/
     usbprobe/              dev.stride.usbprobe: USB inventory + bounded read-only FitPro queries
     motorbench/            dev.stride.motorbench: FitPro1 codec + simulator; physical writes locked
     setup/                 dev.stride.setup: access wizard; core/bundle flavors, payload staging scripts
-  wearables/sense2/        Fitbit Sense 2 HR probe: app/, companion/, common/, settings/, test/, tools/usb-probe.cjs
   tools/
     android5/              console access helper, Termux bootstrap script, and their tests
     unchain.sh             upstream iFit-removal workflow (do not run on the Android 5 console)
@@ -99,7 +102,7 @@ strideApp/
 ```
 
 Ignored and local-only: `console/*/local.properties`, `console/*/local/` (setup payloads,
-per-device records), `tools/android5/local/`, `console/*/build/`, `wearables/sense2/node_modules/`,
+per-device records), `tools/android5/local/`, `console/*/build/`,
 `docs/journal/`. The workspace folder that holds this repo keeps device evidence (`../artifacts/`)
 and research checkouts (`../research/`) outside git.
 
@@ -116,14 +119,14 @@ is no shared live motor service implicitly connecting these components.
 | [`console/motorbench`](../console/motorbench/README.md) — `dev.stride.motorbench`, 0.1.0 simulator | New FitPro1 codec, manual controller, simulated board and prepared locked USB adapter | UI instantiates only simulation; physical writes are compile-time blocked; not installed on treadmill |
 | [`console/setup`](../console/setup/README.md) — `dev.stride.setup`, 0.1.1 | New native access wizard, private baseline, persistence switches and optional APK payload installers | Newly built/emulator-inspected; native UID permissions and vendor USB-debugging request remain physically unvalidated |
 | [`tools/android5`](../tools/android5/README.md) | New tablet shell bootstrap plus explicit-device Python inspection/configuration/reboot/undo helper | Underlying commands and power-cycle outcome verified; packaged helper suite not rerun on a fresh factory setup |
-| [`wearables/sense2`](../wearables/sense2/README.md) — STRIDE HR Probe, source 0.1.11 | New diagnostic clockface, exercise lifecycle, timestamped sensor channel, independent statistics display channel and Fitbit phone companion | Watch-local 0.1.10 test completed; 0.1.11 prepared; phone companion not installed |
+| `wearables/sense2`, STRIDE HR Probe 0.1.11 (removed) | Diagnostic clockface, exercise lifecycle, timestamped sensor channel, independent statistics display channel and Fitbit phone companion | **Removed 2026-11-02 (D16).** Last version at [6d81247](https://github.com/jmonrove/strideApp/tree/6d812473637207cae7771d1654ed9d72f4794590/wearables/sense2) |
 | `homeassistant/`, `protocol/`, `tools/unchain.sh` | Inherited integrations, protocol reference and a broader console replacement workflow | Retained for context/reuse; `unchain.sh` is not this older-console access procedure |
 
 There is a phone **web page** and a Fitbit **companion**, not a newly built
 standalone Pixel Android application. There is no verified direct Sense 2 BLE
 heart-rate connection to the treadmill. The planned watch/phone link uses
 Fitbit-managed peer messaging; the implemented phone/console prototype uses LAN
-HTTP rather than a custom Bluetooth transport.
+HTTP rather than a custom Bluetooth transport. The Fitbit side was removed in D16.
 
 ## Runtime flows
 
@@ -150,8 +153,10 @@ flowchart LR
     Engine --> Simulation["Simulated speed, grade and distance"]
 ```
 
-The watch's local UI is verified; the dashed companion route is blocked by
-installation/authentication failures. The phone browser and HTTP API exercise
+The watch's local UI is verified; the dashed companion route is closed, because
+Fitbit turned off the SDK sign-in that companion installs need (D15). The watch side
+has since been removed from the repository (D16). The Preview's `/api/hr` and
+`/api/hr-display` receivers remain, with nothing sending to them. The phone browser and HTTP API exercise
 preview state only. `DisplayHeartRate` has no reference to `WorkoutEngine` and
 cannot satisfy guided-start eligibility or enter saved guidance HR history.
 
@@ -206,6 +211,9 @@ be forwarded blindly to hardware.
 
 ## Watch acquisition and delivery
 
+*Historical. The probe described here was removed on 2026-11-02 (D16). Its last
+version is at [6d81247](https://github.com/jmonrove/strideApp/tree/6d812473637207cae7771d1654ed9d72f4794590/wearables/sense2).*
+
 The probe is a clockface because that is the successfully installed `rhea`
 artifact. Its UI separates wear state, sensor events, valid timestamped readings,
 exercise state and transport acknowledgements. Screen wake/timer callbacks never
@@ -239,6 +247,17 @@ phone Developer Bridge did not resolve SDK authentication. Local USB installed
 the watch component, but did not install its phone companion. These are recorded
 external integration blockers, not evidence that Sense 2 live streaming is either
 working or permanently impossible.
+
+**Update 2026-11-02.** Google's
+[Health API troubleshooting page](https://developers.google.com/health/troubleshooting)
+says the legacy Fitbit OAuth endpoints, which the SDK sign-in and the phone
+Developer Bridge depend on, would be turned off on 2026-11-02. That day, a separate
+watch-face project on the same watch saw `api.fitbit.com/oauth2/authorize` redirect to a
+legacy login with third-party sign-in disabled, and `www.fitbit.com/oauth2/authorize`
+return the same bare 403. The companion route is therefore treated as closed, not
+blocked. The Sense 2 has no Wi-Fi, so it has no other data path off the watch. Gallery
+publication probably does not accept `rhea` builds either, but that is unconfirmed. See
+D15, D16 and the probe's [last README](https://github.com/jmonrove/strideApp/blob/6d812473637207cae7771d1654ed9d72f4794590/wearables/sense2/README.md).
 
 ## Setup, access and distribution
 
@@ -358,10 +377,6 @@ originals are unchanged.
   explicit approval.
 - **AAPT expands `.gz` assets.** That is why the setup bundle stores the Termux source archive as
   `.bin`, and why `verify_package.py` checks the exact embedded bytes.
-- **The Fitbit CLI starts cloud sign-in before USB discovery,** and SDK OAuth currently returns
-  403. Local installs go through `npm run usb`, which uses the SDK's own USB transport.
-- **Starting a Fitbit exercise writes to the user's Activity Log.** Exercise tests must be started
-  explicitly by the wearer and must never be automatic.
 - **Ignored build trees contain copies of docs.** The `console/setup` build copies
   `tools/android5/README.md` into generated assets, so exclude `build/` when you search.
 
@@ -385,7 +400,9 @@ has been validated. “Deferred” means a future requirement rather than curren
 | D11 — accepted, experimental path | Offer the inspected vendor USB-debugging hook only as an explicit, guarded action | Bootstrap may work without prior ADB; broader debug/root-mode side effects are disclosed and physical proof is still required |
 | D12 — accepted | Bundle unchanged Termux optionally, separate from native setup code | Offline fallback and normal installer approvals; core avoids the size and redistribution requirements of third-party binaries |
 | D13 — deferred | Connect the workout engine to a validated motor adapter | Requires verified board ownership, feedback, key/start/stop semantics, fault behavior and operator-present staged tests |
-| D14 — deferred | Use live Sense 2 HR for workload adaptation | Requires a working phone companion and an honest acquisition/freshness contract; no relaxation to hide current gaps |
+| D14 — superseded by D15 (2026-11-02) | Use live Sense 2 HR for workload adaptation | Requires a working phone companion and an honest acquisition/freshness contract; no relaxation to hide current gaps. The companion can no longer be installed |
+| D15 — accepted (2026-11-02) | Use the treadmill's own pulse input (FitPro field 10) as the candidate live HR source, and keep the Sense 2 as an on-wrist display only | The board advertises field 10, but it is not established whether this machine feeds it from hand grips or a strap receiver; upstream's C 1750 has no grips and read zero all walk. Reading it stays read-only, the Preview gains no USB code (D04), and readings still need their age (D07). The packed field's sample count is a candidate freshness signal. Alternative not adopted for now: a standard Bluetooth strap read by the console (upstream `HeartRate.kt`) |
+| D16 — accepted (2026-11-02) | Remove the Sense 2 probe (`wearables/sense2`) from the repository | With no data path off the watch, it has no role in the console system; the watch stays a display with Fitbit's own faces. The last version is at [6d81247](https://github.com/jmonrove/strideApp/tree/6d812473637207cae7771d1654ed9d72f4794590/wearables/sense2). The Preview's `/api/hr` (source `sense2`) and `/api/hr-display` (source `sense2_exercise`) receivers stay in its code with no sender, until the pulse-input route (D15) decides what they become |
 
 ## Validation snapshot and next gates
 
@@ -396,20 +413,24 @@ has been validated. “Deferred” means a future requirement rather than curren
 | Preview | 36 JVM tests, build/full lint; 0.2.0 UI/simulation on console | Physical deployment of 0.2.1; live HR relay; motor actuation |
 | USB probe | 17 JVM tests; actual bounded read-only board identity/status/limits | Cold-start initialization and moving-feedback validity |
 | Motor bench | 33 JVM tests; emulator connect/arm/start/run/stop simulation | Physical motion, watchdogs, controller ownership under real failures |
-| Sense 2 | 68 source tests; watch installation and explicit exercise/statistics tests | Companion installation, full wireless path and continuously fresh acquisition |
+| Sense 2 probe (removed, D16) | Until removal: 68 source tests; watch installation and explicit exercise/statistics tests | Not pursued: the companion route closed (D15) and the probe was removed (D16) |
+| Treadmill pulse input | The board lists field 10 (Pulse) in the read-only probe's supported-fields reply | Whether it reads non-zero on this machine, its update cadence, and whether its sample count proves freshness |
 | Inherited full motor app | Android compatibility build/profile checks | Installation, motor operation or full lint acceptance on this target |
 
 Tests listed are the recorded successful checks for each component, not a claim
 that an all-system end-to-end test was rerun for this documentation update.
 
-Next validation gates (watch transport and motor work can proceed independently):
+Next validation gates (heart-rate and motor work can proceed independently):
 
 1. Test the setup APK on the actual tablet, one explicit action at a time; confirm
    rejection/fallback behavior and repeat reboot verification. First Android
    entry, installs and RSA approval remain manual as listed in the root README.
-2. Restore/install a functioning Fitbit phone-companion path and verify distinct
-   phone receipt, console receipt and stale/disconnect behavior. Preserve the
-   display-only contract for statistics with unknown acquisition age.
+2. Establish whether this machine reports pulse. Add the board's Pulse field (10) to
+   the USB probe's read-only query allowlist, and read it with hands on the grips, or
+   with a strap if the console has a receiver. If it reports real values, measure their
+   cadence, check whether the sample count proves each reading is new, and design a
+   route into the Preview that adds no USB code to it. The Sense 2 companion route is
+   closed and its probe removed (D15, D16).
 3. With an operator present, establish cold-start reads and exclusive board
    ownership, independently validate actual speed/grade, key behavior and stopping.
    Then validate a separate bounded manual actuation build and process/transport

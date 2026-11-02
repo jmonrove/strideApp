@@ -26,8 +26,8 @@ of bug never ships twice.**
 - [ ] No new write or actuation path: `LockedUsbLink` still rejects physical writes before they
       are transmitted, the bench still refuses to arm a physical link, and `usbprobe` still sends
       only allowlisted read queries
-- [ ] No motor-free module (`workoutlab`, `setup`, `sense2`) gained a USB/FitPro dependency, and
-      `WorkoutEngine` / heart rate is not wired to any board adapter (D13, D14)
+- [ ] No motor-free module (`workoutlab`, `setup`) gained a USB/FitPro dependency, and
+      `WorkoutEngine` / heart rate is not wired to any board adapter (D13, D15)
 - [ ] An ACK is not treated as motion, and a simulated Stop is not presented as a hardware
       guarantee (D08)
 
@@ -52,7 +52,6 @@ of bug never ships twice.**
 
 - [ ] Nothing above API 22 without a version guard; `targetSdk` stays at 28; lint still runs
 - [ ] UI JS/CSS runs on Chromium 83 (no `replaceAll`, `.at()`, `:has()`, `inset`)
-- [ ] The Fitbit SDK and CLI versions are unchanged, and watch code still builds for `rhea`
 
 ## 5. Secrets, privacy & security
 

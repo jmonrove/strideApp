@@ -6,11 +6,11 @@ coding agent.** `AGENTS.md` and `CODEX.md` defer here. When instructions conflic
 
 strideApp replaces the iFit software on a NordicTrack treadmill console. This fork (branch
 `android-5-compat`) ports it to one Android 5.1 / API 22 console and adds separate modules that
-cannot drive the motor: Kotlin/Android apps under `console/` (each one its own Gradle root), a Fitbit
-Sense 2 heart-rate probe in JavaScript under `wearables/sense2`, and Python access helpers under
-`tools/android5`. **The fact to know first: physical motor control and the live
-watch → phone → console heart-rate path are not validated, and the modules are kept apart on
-purpose until they are.**
+cannot drive the motor: Kotlin/Android apps under `console/` (each one its own Gradle root) and
+Python access helpers under `tools/android5`. **The fact to know first: physical motor control is not validated
+and there is no live heart-rate source yet. The Fitbit watch route is closed and its probe was
+removed (D16); the treadmill's own pulse input is next (D15). The modules are kept apart on purpose until both are
+proven.**
 
 **How the docs work: the rules that bind an agent live in this file. The conventions the code must
 satisfy, and all other knowledge, live in `docs/` and the module READMEs.** Read this file fully,
@@ -27,26 +27,27 @@ then pull in only what your task needs via the routing table below.
    to the limits the board reports; automatic stops ramp down, while STOP acts immediately.
 2. **Never weaken a motor isolation boundary unless the developer explicitly asks.** Don't remove or
    bypass `LockedUsbLink`'s rejection of physical writes, and don't add a runtime unlock to
-   `console/motorbench`. Don't give `console/workoutlab`, `console/setup` or `wearables/sense2` a
-   USB/FitPro transport. Don't connect `WorkoutEngine` proposals or heart rate to any board adapter
-   (decisions D09, D13 and D14 in [`docs/architecture.md`](docs/architecture.md)). Don't add write or
-   actuation commands to `console/usbprobe`.
-3. **Every action against the real console or watch needs the developer's OK, every time, with the
+   `console/motorbench`. Don't give `console/workoutlab` or `console/setup` a USB/FitPro
+   transport. Don't connect `WorkoutEngine` proposals or heart rate to any board adapter
+   (decisions D09, D13 and D15 in [`docs/architecture.md`](docs/architecture.md)). Don't add write or
+   actuation commands to `console/usbprobe`. Reading the board's pulse field read-only is allowed
+   (D15); letting heart rate drive the motor is not.
+3. **Every action against the real console needs the developer's OK, every time, with the
    developer present.** That covers `adb install`, `am start`, `setprop`, broadcasts,
-   `connectedDebugAndroidTest`, reboots and Fitbit USB installs. Before you run it, say what you
+   `connectedDebugAndroidTest` and reboots. Before you run it, say what you
    will run and on which serial. Always pass an explicit serial (`adb -s "$STRIDE_DEVICE"`) and
    never act on whatever happens to be attached. Never install the motor-capable `dev.stride.hud`
    app on the console. Never run `tools/unchain.sh` on the Android 5 console: it disables the iFit
    packages, which this access route deliberately keeps (D03).
 4. **Keep the levels of evidence separate.** "Builds", "unit tests pass", "works on the emulator"
-   and "verified on the treadmill or watch" are four different claims. Never write a stronger claim
+   and "verified on the treadmill" are four different claims. Never write a stronger claim
    than you observed, whether in code comments, a README, the validation snapshot or your report.
 5. **Never pass along a number without its age.** Heart-rate and health values carry their
    acquisition time. A poll, an ACK or a property readback does not prove a fresh measurement or
    real motion. Display-only readings (`hr_display` / `sense2_exercise`) must never become
    guidance input (D07).
 6. **This repo is public.** Never commit any of these: `local.properties`; keystores (`*.jks`,
-   `*.keystore`, `*.p12`); `homeassistant/stride.conf`; broker credentials; Fitbit or SDK tokens;
+   `*.keystore`, `*.p12`); `homeassistant/stride.conf`; broker credentials; API or SDK tokens;
    console IP addresses, boot IDs or serials; heart-rate or health values, or screenshots showing
    them; extracted iFit or vendor binaries, or decompiled vendor code. Commits use the GitHub
    noreply identity (`32687858+jmonrove@users.noreply.github.com`), so check
@@ -57,7 +58,7 @@ then pull in only what your task needs via the routing table below.
    (keranm). Never push or move `main`. Never push a `v*` tag, because that fires
    `.github/workflows/release.yml`. Never force-push. Routine work is committed on
    `android-5-compat`. Work that could move the belt or deck, or that connects heart rate to
-   workload (D13, D14), starts on a short-lived feature branch and comes back with
+   workload (D13, D15), starts on a short-lived feature branch and comes back with
    `git merge --ff-only`, as the runbook describes.
 8. **Inherited upstream material stays upstream's.** The lower half of `README.md`, plus
    `SAFETY.md`, `CONTRIBUTING.md`, `docs/INSTALL.md` and `docs/RELEASE_NOTES.md`, describe keranm's
@@ -77,7 +78,7 @@ then pull in only what your task needs via the routing table below.
 | Android 5 port status, ADB/iFit findings, board-query evidence | [`docs/ANDROID_5_PORT.md`](docs/ANDROID_5_PORT.md) |
 | Console access: Wi-Fi ADB, privileged mode, undo steps | [`tools/android5/README.md`](tools/android5/README.md) |
 | The FitPro serial protocol | [`protocol/FITPRO_PROTOCOL.md`](protocol/FITPRO_PROTOCOL.md) |
-| One module | Its README: [`console/workoutlab`](console/workoutlab/README.md) · [`console/usbprobe`](console/usbprobe/README.md) · [`console/motorbench`](console/motorbench/README.md) · [`console/setup`](console/setup/README.md) · [`wearables/sense2`](wearables/sense2/README.md). `console/stride` has none; use `CONTRIBUTING.md` |
+| One module | Its README: [`console/workoutlab`](console/workoutlab/README.md) · [`console/usbprobe`](console/usbprobe/README.md) · [`console/motorbench`](console/motorbench/README.md) · [`console/setup`](console/setup/README.md). `console/stride` has none; use `CONTRIBUTING.md` |
 | Upstream install, Home Assistant, releases | [`docs/INSTALL.md`](docs/INSTALL.md) · [`homeassistant/stride.conf.example`](homeassistant/stride.conf.example) · [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md) |
 | Why something was built the way it was | The decision record in [`docs/architecture.md`](docs/architecture.md); [`docs/plans/`](docs/plans/) (dated records: don't edit) |
 
@@ -86,7 +87,7 @@ then pull in only what your task needs via the routing table below.
 Fork status is quoted in several places, and a change that moves it must update all of them in the
 same change:
 
-- **New device or watch evidence** (or a failed attempt) → the module README's validation section,
+- **New device evidence** (or a failed attempt) → the module README's validation section,
   the validation snapshot in `docs/architecture.md`, the status column and diagram colors in
   `README.md`, and `docs/ANDROID_5_PORT.md` if it concerns the port. Date the entry. The evidence
   file goes to `../artifacts/`.
@@ -106,9 +107,6 @@ same change:
   is its own Gradle root, so run `./gradlew` from inside it. In `console/stride`, set
   `JAVA_HOME` explicitly before `./gradlew`, because without it Gradle tends to fail with a
   misleading error. `./run.sh` sets it for you, but needs a device even for `build`.
-- **Node:** `wearables/sense2`: `npm ci`, `npm test` (`node --test`), `npm run build` →
-  `build/app.fba`. The Fitbit SDK is pinned (`@fitbit/sdk` 6.2.0-pre.1, `@fitbit/sdk-cli`
-  1.8.0-pre.10); don't bump it.
 - **Python:** 3.8+, standard library only. `python3 -m unittest discover -s tools/android5 -p
   'test_*.py' -v`.
 - **Tests:** each module has its own command; see the table in
@@ -118,8 +116,8 @@ same change:
   `homeassistant/stride.conf`.
 - **Device:** set `STRIDE_DEVICE=<ip>:5555` for `run.sh` and the access helper, and `ANDROID_SERIAL`
   for Gradle connected tests. Never hardcode an address.
-- **Build/deploy:** `git push origin android-5-compat` is the ship. Installing on the console or
-  watch is a separate step, gated by rule 3. See
+- **Build/deploy:** `git push origin android-5-compat` is the ship. Installing on the console is a
+  separate step, gated by rule 3. See
   [`docs/runbooks/deploy.md`](docs/runbooks/deploy.md).
 - **Verify:** [`docs/runbooks/verify.md`](docs/runbooks/verify.md). Tests and the emulator by
   default; the console only with the developer's OK for that run.

@@ -13,9 +13,9 @@ bind every run, whether or not they are repeated here.
 
 | | |
 |---|---|
-| **How the app is exercised** | (1) The touched module's test and lint commands. (2) Android UI on a local emulator at the console's 800×480 / 160 dpi. (3) Console HTML UIs in a desktop browser with the stubbed bridge. (4) The real console or watch, **only with the developer's OK for that run** |
-| **Environment** | Local machine and emulator by default. The real console (`$STRIDE_DEVICE`) and watch only with approval. Never anything that drives the motor |
-| **Test accounts / data** | None. The Lab generates a fresh pairing token on every launch, and simulated HR is built in. Fitbit SDK sign-in belongs to the developer: never automate it |
+| **How the app is exercised** | (1) The touched module's test and lint commands. (2) Android UI on a local emulator at the console's 800×480 / 160 dpi. (3) Console HTML UIs in a desktop browser with the stubbed bridge. (4) The real console, **only with the developer's OK for that run** |
+| **Environment** | Local machine and emulator by default. The real console (`$STRIDE_DEVICE`) only with approval. Never anything that drives the motor |
+| **Test accounts / data** | None. The Lab generates a fresh pairing token on every launch, and simulated HR is built in. |
 | **Writes data?** | Emulator: app-private storage only. Console: the Lab's connected test saves one synthetic session and then restores the prior history, but only when run with the leave-installed flag (Device check step 3); without the flag it deletes the app's data. Access/setup actions change device state (see Data safety) |
 
 ## Module checks (always)
@@ -29,7 +29,6 @@ Run from the module directory with JDK 17 or 21 and `ANDROID_HOME` set:
 | `console/motorbench` | `./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug` |
 | `console/setup` | `./gradlew :app:assembleCoreDebug :app:testCoreDebugUnitTest :app:lintCoreDebug`. The bundle variant needs `prepare_bundle.py` first; see its README |
 | `console/stride` | `JAVA_HOME="$(/usr/libexec/java_home -v 17)" ./gradlew :app:assembleDebug :app:lintDebug -PcompatLint`. `-PcompatLint` checks the API boundary only, so this is not a full lint pass. The module has no unit tests. Don't use `./run.sh build` here: `run.sh` exits when no device is attached, even for `build` |
-| `wearables/sense2` | `npm ci && npm test && npm run build` |
 | `tools/android5` | `python3 -m unittest discover -s tools/android5 -p 'test_*.py' -v` and `sh -n tools/android5/enable-wifi-adb.sh` (from the repo root) |
 
 ## Emulator UI check (Android modules)
@@ -82,8 +81,6 @@ board, nobody is on the belt and the safety key is removed. Motor-free packages 
    remove the leftover test package: `adb -s "$STRIDE_DEVICE" uninstall dev.stride.lab.test`.
 4. Screenshot: `adb -s "$STRIDE_DEVICE" exec-out screencap -p >
    "$(git rev-parse --show-toplevel)/../artifacts/<area>-<what>-<version>.png"`.
-5. Watch (from `wearables/sense2`): `npm run usb -- install`, `npm run usb -- launch`,
-   `npm run usb -- screenshot /absolute/path/to/artifacts/<name>.png`.
 
 ## Data safety
 
@@ -105,8 +102,7 @@ board, nobody is on the belt and the safety key is removed. Motor-free packages 
   keep it.
 - **Never:** install or launch `dev.stride.hud` on the console; send board commands beyond
   `usbprobe`'s allowlisted reads (its driver-detach claim mode needs its own approval); run
-  `tools/unchain.sh`; reboot the console yourself; sign in to the Fitbit SDK on the developer's
-  behalf.
+  `tools/unchain.sh`; or reboot the console yourself.
 
 ## Evidence
 
@@ -117,7 +113,7 @@ board, nobody is on the belt and the safety key is removed. Motor-free packages 
   checks performed.
 - The report states the level each claim reached (built, unit tests, emulator, device) and the
   build that was tested.
-- Watch and HR screenshots show biometric values. They stay in `artifacts/`. When repo docs
+- Screenshots that show heart rate are biometric data. They stay in `artifacts/`. When repo docs
   quote a result, they quote counts and timings, not BPM.
 
 ---

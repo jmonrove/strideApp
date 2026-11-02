@@ -2,7 +2,7 @@
 
 The style detail. The agent contract (the rules) is in [`../CLAUDE.md`](../CLAUDE.md); this file is
 the knowledge it references. Three languages live here: Kotlin (`console/`), JavaScript
-(`wearables/sense2`, the bundled console UIs), and Python (`tools/android5`, `homeassistant/`,
+(the bundled console UIs), and Python (`tools/android5`, `homeassistant/`,
 `protocol/`). Each follows its own idiom, as set out below. Match the module you are in.
 
 ## Naming conventions
@@ -21,10 +21,10 @@ the knowledge it references. Three languages live here: Kotlin (`console/`), Jav
 | Kotlin tests | `<Class>Test.kt`; methods are camelCase behavior sentences | `staleSensorHoldsUntilExplicitResume()` |
 | Logcat tags | `Stride` + PascalCase area | `Stride`, `StrideBoardRead`, `StrideHistory` |
 | **Physical quantities** | **The unit is a suffix on the name**, in every language | `baseSpeedMph`, `decisionIntervalMs`, `inclineRatePercentPerSec`, `targetLowBpm`, `acquisitionAgeMs` |
-| JS functions / variables | camelCase | `createDisplayRelay`, `inspectFrame` |
-| JS files | kebab-case; tests are `<name>.test.mjs` | `display-relay.js`, `stride-core.js`, `protocol.test.mjs` |
-| JSON fields (HTTP, watch messages) | camelCase, with the unit suffix | `sessionId`, `pollAgeMs`, `displayOnly` |
-| Enumerated string values on the wire | Depends on the family; match the one you extend, because a value in the wrong case is rejected. Kotlin enum names go over the Lab bridge and HTTP as-is (UPPER_SNAKE, parsed with `valueOf`). Watch-message kinds, sources and quality values are snake_case | `PHONE`, `SIMULATED`; `hr_display`, `sense2_exercise`, `acquisition_unknown` |
+| JS functions / variables | camelCase | `toScreen`, `trueAt` |
+| JS files | kebab-case, or one lowercase word | `stride-core.js`, `stride-settings.js`, `console.js` |
+| JSON fields (HTTP) | camelCase, with the unit suffix | `sessionId`, `pollAgeMs`, `displayOnly` |
+| Enumerated string values on the wire | Depends on the family; match the one you extend, because a value in the wrong case is rejected. Kotlin enum names go over the Lab bridge and HTTP as-is (UPPER_SNAKE, parsed with `valueOf`). Heart-rate ingress sources and quality values are snake_case | `PHONE`, `SIMULATED`; `hr_display`, `sense2_exercise`, `acquisition_unknown` |
 | HTTP routes (Lab `PreviewServer`) | Phone-UI routes are bare lowercase paths; sensor ingress lives under `/api/` in kebab-case | `/status`, `/routines`, `/action`; `/api/hr`, `/api/hr-display` |
 | Python modules / functions / variables | snake_case; Home Assistant scripts start with `stride_` | `console_access.py`, `stride_reminders.py` |
 | Python classes | PascalCase | `Access` |
@@ -79,8 +79,6 @@ No formatter or linter config is checked in (no ktlint, detekt, Prettier or Blac
   spacing. A successful native build does not validate the HTML.
 - **WebViews load bundled assets only** (`https://stride.local/` in the Lab). No remote navigation,
   no file or content access, no external requests.
-- **Fitbit SDK versions are pinned** (`@fitbit/sdk` 6.2.0-pre.1, CLI 1.8.0-pre.10). Watch code
-  targets `rhea` only.
 
 ## Security & error handling
 
@@ -112,7 +110,7 @@ Instances from this repo, where the same trap surfaces as a hardware or freshnes
   correctly on the same boot. Only a changed boot ID shows a new boot, and visible privileged mode
   has to be checked separately.
 - **A sensor or HTTP error is not "no data".** A stalled or failed request must show as stalled or
-  failed (the companion reports `receiver: stalled`), never as an empty reading.
+  failed, never as an empty reading.
 
 Generic instances: `$(cmd)` in shell is empty both when the command fails and when it legitimately
 prints nothing; `grep -c` exits 1 on a count of zero, which under `set -e` kills the caller on the

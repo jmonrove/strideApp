@@ -25,7 +25,6 @@ is the knowledge it routes to.
 | [`../console/usbprobe/README.md`](../console/usbprobe/README.md) | Read-only board identification and the bounded query path |
 | [`../console/motorbench/README.md`](../console/motorbench/README.md) | Motor simulator, the locked USB adapter, outstanding physical work |
 | [`../console/setup/README.md`](../console/setup/README.md) | Setup APK: access switches, USB-debugging hook, Termux bundle |
-| [`../wearables/sense2/README.md`](../wearables/sense2/README.md) | Sense 2 HR probe: build, USB install, test log |
 | [`../protocol/FITPRO_PROTOCOL.md`](../protocol/FITPRO_PROTOCOL.md) | The FitPro serial protocol |
 
 ## Inherited from upstream (keranm/strideApp)

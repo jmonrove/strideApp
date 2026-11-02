@@ -9,8 +9,8 @@ ship. It cannot authorise skipping the rails that apply everywhere (staging by e
 confirmation gates, no force-push, no history rewrite). If a step here appears to conflict with
 `CLAUDE.md`, `CLAUDE.md` is correct and this file needs fixing.
 
-**Shipping is a git push. It installs nothing.** Installing a build on the treadmill console or the
-Sense 2 watch is a separate hardware action that needs the developer's OK each time
+**Shipping is a git push. It installs nothing.** Installing a build on the treadmill console is a
+separate hardware action that needs the developer's OK each time
 (CLAUDE.md rule 3). See "Device installs" below. It is never a step of this ceremony.
 
 ## At a glance
@@ -21,7 +21,7 @@ Sense 2 watch is a separate hardware action that needs the developer's OK each t
 | **Integration branch** | None. Routine work is committed straight onto `android-5-compat`, and its history is linear, with no merges. Risky work starts on a short-lived feature branch (see Merge style) |
 | **Production branch** | `android-5-compat` on `origin`. `main` stays at the upstream fork point `d9e1b53` and is not shipped to |
 | **Production push** | `git push origin android-5-compat` |
-| **Merge style** | Fast-forward only: `git merge --ff-only <feature-branch>` into `android-5-compat`, never a merge commit. Use a feature branch for work that could move the belt or deck, or that connects heart rate to workload (D13, D14), and for anything else the developer wants kept off the main line until it is tested |
+| **Merge style** | Fast-forward only: `git merge --ff-only <feature-branch>` into `android-5-compat`, never a merge commit. Use a feature branch for work that could move the belt or deck, or that connects heart rate to workload (D13, D15), and for anything else the developer wants kept off the main line until it is tested |
 | **Deploy is reversible?** | Yes, with `git revert` and a new push. Never by rewriting history |
 
 ## Ceremony
@@ -58,7 +58,7 @@ Sense 2 watch is a separate hardware action that needs the developer's OK each t
 
 - `git revert <sha>` on `android-5-compat`, then run this ceremony again. Never use `reset` +
   force-push.
-- A build already installed on the console or watch is not rolled back by git. Reinstalling a
+- A build already installed on the console is not rolled back by git. Reinstalling a
   previous build is a device install (below) and needs the developer's OK.
 
 ## Device installs (not part of this ceremony)
@@ -68,7 +68,6 @@ These happen only when the developer asks, at that moment, with the developer pr
 - **Console (motor-free packages only: `dev.stride.lab`, `.usbprobe`, `.motorbench`, `.setup`):**
   `adb -s "$STRIDE_DEVICE" install -r <module>/app/build/outputs/apk/<variant>/<apk>`, then the
   `am start` line from the module README. Never install `dev.stride.hud`.
-- **Watch:** from `wearables/sense2`, run `npm run usb -- install`, then `npm run usb -- launch`.
 - Afterwards, record the build, date and outcome in the module README and the validation snapshot
   in `docs/architecture.md`. Put the evidence file in the `artifacts/` folder beside the repo
   (`$(git rev-parse --show-toplevel)/../artifacts/`).

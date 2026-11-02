@@ -11,16 +11,15 @@ through [`docs/README.md`](docs/README.md).
 
 ### Tooling defaults
 - Prefer `rg` for search and `rg --files` for file discovery. Add `-g '!**/build/**' -g
-  '!**/.gradle/**' -g '!**/node_modules/**'`, because the ignored build trees contain generated
+  '!**/.gradle/**'`, because the ignored build trees contain generated
   copies of the READMEs.
 - Use `apply_patch` for small, focused edits.
 - Each `console/<module>` is its own Gradle root: `cd` into it before `./gradlew`.
 
 ### Sandbox and approvals
-- The first Gradle or `npm ci` run downloads dependencies. If the network is restricted, ask
+- The first Gradle run downloads dependencies. If the network is restricted, ask
   before fetching anything.
-- Reaching the console (`adb connect`, installs, connected tests) or the watch (USB) is a hardware
-  action under rule 3 of CLAUDE.md. A sandbox denial is never a reason to try a different device or
+- Reaching the console (`adb connect`, installs, connected tests) is a hardware action under rule 3 of CLAUDE.md. A sandbox denial is never a reason to try a different device or
   serial.
 
 ### Response style & editing hygiene

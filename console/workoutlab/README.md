@@ -93,9 +93,11 @@ The existing phone page selects routines/durations, shows proposals and freshnes
 changes sensor input, and offers manual override/pause/stop.
 
 No live Sense 2 connection is implied by selecting phone input. The receiver
-shows waiting/stale until valid fresh samples actually arrive. The watch probe
-and its remaining installation/streaming status are documented in
-[`../../wearables/sense2/README.md`](../../wearables/sense2/README.md).
+shows waiting/stale until valid fresh samples actually arrive. The Sense 2 probe
+these receivers were built for was removed on 2026-11-02, after Fitbit turned off
+the sign-in its phone companion needed, so nothing sends to them now. Its last
+version is in [git history](https://github.com/jmonrove/strideApp/tree/6d812473637207cae7771d1654ed9d72f4794590/wearables/sense2). See decisions D15 and D16 in
+[docs/architecture.md](../../docs/architecture.md#decision-record).
 
 The current prototype uses HTTP on the local LAN. It is not encrypted; do not
 expose it through router forwarding or a public tunnel. Tokens are generated per
@@ -104,7 +106,7 @@ saved by the phone page. Other than the static pairing page, endpoints require
 a token. There is no CORS allowance. The bounded server uses two workers, four
 queued clients, 8 KiB headers, 4 KiB bodies and three-second socket read timeouts.
 
-Configure the Sense 2 companion, after verifying watch-to-phone delivery, with:
+The removed Sense 2 companion was configured with:
 
 ```text
 http://<console-ip>:8780/api/hr
@@ -171,5 +173,5 @@ The phone page and Sensors screen label it as display only. Neither an accepted
 poll nor a changing BPM establishes acquisition freshness.
 
 Build, 36 JVM tests and full lint pass. Physical display/relay delivery for this
-version remains pending because Wi-Fi ADB did not respond at 192.168.86.64:5555
-and the Fitbit companion has not yet been installed. No motor transport is linked.
+version remains pending because Wi-Fi ADB did not respond at the console's address
+and the Fitbit companion was never installed. No motor transport is linked.
