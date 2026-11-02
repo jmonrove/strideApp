@@ -1,5 +1,7 @@
 # STRIDE Android 5.1 fork: architecture and decisions
 
+The system map. Rules for agents live in [`../CLAUDE.md`](../CLAUDE.md); this file is knowledge.
+
 Snapshot: **2026-10-30**, branch `android-5-compat`. This document describes what
 exists, its provenance, and the boundaries intentionally retained while validating
 one older console. It is not an assertion that the full adaptive treadmill system
@@ -62,6 +64,44 @@ called “1750.” The external full-size USB port did not enumerate the tablet 
 ADB in our cable tests; initial ADB access was bootstrapped over the LAN.
 Detailed evidence is in [ANDROID_5_PORT.md](ANDROID_5_PORT.md) and the
 [access guide](../tools/android5/README.md).
+
+## Technology stack
+
+| Layer | What it uses |
+|---|---|
+| Console apps | Kotlin 1.9.24, Android Gradle Plugin 8.5.2, Gradle 8.9 wrapper (one wrapper per app); compileSdk 34, minSdk 22, targetSdk 28; JVM target 17. Framework APIs only (no AndroidX); JUnit 4.13.2 for JVM tests |
+| Console UI | HTML/CSS/JS bundled as APK assets in a WebView (Chromium 83 on the target). The Lab serves the same state to a phone page over LAN HTTP on port 8780 |
+| Upstream integrations (`console/stride`) | FitPro USB HID transport, Bluetooth LE FTMS peripheral (telemetry only), Eclipse Paho MQTT 1.2.5 with Home Assistant MQTT discovery |
+| Watch | Fitbit SDK 6.2.0-pre.1 / CLI 1.8.0-pre.10 (pinned), build target `rhea` (Sense 2); watch app, phone companion, settings; Node's built-in test runner |
+| Host tooling | Python 3.8+ standard library (`tools/android5`, `protocol/`, `console/setup` staging); POSIX shell; Android Platform Tools (`adb`) |
+| Home Assistant side | Python scripts plus `packages/stride.yaml`, configured by `homeassistant/stride.conf` (inherited, not validated in this fork) |
+| Datastores | None. App-private storage on the console; HA entities over MQTT |
+
+## Project structure
+
+```
+strideApp/
+  console/                 one Android app per directory, each its own Gradle root
+    stride/                dev.stride.hud: inherited full motor app (not installed on this target)
+    workoutlab/            dev.stride.lab: STRIDE Preview; workout engine, console UI, phone page, HR receivers
+    usbprobe/              dev.stride.usbprobe: USB inventory + bounded read-only FitPro queries
+    motorbench/            dev.stride.motorbench: FitPro1 codec + simulator; physical writes locked
+    setup/                 dev.stride.setup: access wizard; core/bundle flavors, payload staging scripts
+  wearables/sense2/        Fitbit Sense 2 HR probe: app/, companion/, common/, settings/, test/, tools/usb-probe.cjs
+  tools/
+    android5/              console access helper, Termux bootstrap script, and their tests
+    unchain.sh             upstream iFit-removal workflow (do not run on the Android 5 console)
+    hud_drive.py           upstream: drives the HUD from a laptop with fabricated state, belt cold
+  protocol/                FitPro protocol notes, bitfields, extraction scripts (inherited)
+  homeassistant/           optional coach/reminder/dashboard scripts (inherited)
+  docs/                    this map, the coding standards, runbooks, port log, upstream install guide
+  .github/                 upstream release workflow + issue templates
+```
+
+Ignored and local-only: `console/*/local.properties`, `console/*/local/` (setup payloads,
+per-device records), `tools/android5/local/`, `console/*/build/`, `wearables/sense2/node_modules/`,
+`docs/journal/`. The workspace folder that holds this repo keeps device evidence (`../artifacts/`)
+and research checkouts (`../research/`) outside git.
 
 ## Components and ownership
 
@@ -261,6 +301,66 @@ the preview's HTTP token are distinct access controls. Neither permits automatic
 workout-to-motor integration. Production signing, encrypted phone transport,
 release/source packaging and a second-device compatibility matrix remain work
 beyond the current local debug builds.
+
+## Build & run
+
+Each console app builds from its own directory with its own wrapper. The exact per-module test and
+lint commands are in [`runbooks/verify.md`](runbooks/verify.md); the environment is in
+[`../CLAUDE.md`](../CLAUDE.md). `console/stride/run.sh` builds, installs, launches and tails logcat
+for the inherited app. Use its `build` argument when you don't want to touch a device. The other
+modules' READMEs give their `adb install` / `am start` lines. Installing on the real console or
+watch is gated by CLAUDE.md rule 3.
+
+## Configuration
+
+- **Build-time:** `console/<module>/local.properties` holds `sdk.dir`, and for `console/stride`
+  also the `mqtt.*` broker seed and the four `stride.keystore*` signing lines. Without a keystore,
+  the release variant builds unsigned and `run.sh` falls back to debug.
+- **Runtime:** everything else is set on the console's own screens and stored privately: Settings
+  in `console/stride`, `ConsolePreferences` in the Lab. Setup baselines stay in the setup app's
+  private storage.
+- **Device selection:** `STRIDE_DEVICE` (`run.sh`, the access helper) and `ANDROID_SERIAL` (Gradle
+  connected tests). The access helper refuses any profile other than the tested model, build and
+  Admin version.
+- **Home Assistant:** `homeassistant/stride.conf`, copied from `stride.conf.example`.
+
+## Deployment
+
+Shipping is `git push origin android-5-compat`, as set out in
+[`runbooks/deploy.md`](runbooks/deploy.md). There is no fork release or CI build. The inherited
+`.github/workflows/release.yml` builds and publishes the upstream `dev.stride.hud` app on a `v*`
+tag, so the fork never pushes one. Builds reach the console and watch by manual install, which
+records its evidence in the module README and in the validation snapshot below.
+
+## Known gotchas
+
+Durable facts copied forward from the port log, the module READMEs and `CONTRIBUTING.md`. The
+originals are unchanged.
+
+- **Run `console/stride` through `run.sh`.** Calling `./gradlew` directly tends to fail in a way
+  that blames the wrong thing (`CONTRIBUTING.md`).
+- **`-PcompatLint` is not a full lint pass.** It checks only NewApi/InlinedApi. Unfiltered lint
+  still reports the existing MissingPermission findings in `Ftms.kt` (`ANDROID_5_PORT.md`).
+- **ADB has to start over the LAN.** In cable tests, the console's external full-size USB port did
+  not enumerate the tablet for ADB.
+- **After a reboot, adbd runs as `shell` (uid 2000), not root.** Persistent iFit privileged mode is
+  not Android root; neither one implies the other.
+- **Command 2 is a core FitPro command even when SupportedCommands omits it.** The board
+  advertises optional commands there. Requiring 2 in that list made the first identity run stop
+  early (`ANDROID_5_PORT.md`).
+- **Don't identify the board by the protocol's manufacturer field.** It varied across identity
+  replies. Use USB VID/PID plus the returned model and part numbers.
+- **Linux reattaches `usbhid`** after the probe releases the interface, which blocks the next
+  non-forced claim. The forced path is limited to a sysfs-confirmed `usbhid` owner and needs
+  explicit approval.
+- **AAPT expands `.gz` assets.** That is why the setup bundle stores the Termux source archive as
+  `.bin`, and why `verify_package.py` checks the exact embedded bytes.
+- **The Fitbit CLI starts cloud sign-in before USB discovery,** and SDK OAuth currently returns
+  403. Local installs go through `npm run usb`, which uses the SDK's own USB transport.
+- **Starting a Fitbit exercise writes to the user's Activity Log.** Exercise tests must be started
+  explicitly by the wearer and must never be automatic.
+- **Ignored build trees contain copies of docs.** The `console/setup` build copies
+  `tools/android5/README.md` into generated assets, so exclude `build/` when you search.
 
 ## Decision record
 

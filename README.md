@@ -49,7 +49,7 @@ or establish a working Sense 2 → phone → treadmill stream.
 
 See the [complete access instructions and undo steps](tools/android5/README.md),
 [setup APK details](console/setup/README.md), and
-[architecture and decision record](docs/ARCHITECTURE.md).
+[architecture and decision record](docs/architecture.md).
 
 ## Upstream project documentation
 
