@@ -307,14 +307,16 @@ beyond the current local debug builds.
 Each console app builds from its own directory with its own wrapper. The exact per-module test and
 lint commands are in [`runbooks/verify.md`](runbooks/verify.md); the environment is in
 [`../CLAUDE.md`](../CLAUDE.md). `console/stride/run.sh` builds, installs, launches and tails logcat
-for the inherited app. Use its `build` argument when you don't want to touch a device. The other
+for the inherited app. It needs an attached device or `STRIDE_DEVICE` even for its `build`
+argument, so for a build with no device, set `JAVA_HOME` and call `./gradlew` yourself. The other
 modules' READMEs give their `adb install` / `am start` lines. Installing on the real console or
 watch is gated by CLAUDE.md rule 3.
 
 ## Configuration
 
 - **Build-time:** `console/<module>/local.properties` holds `sdk.dir`, and for `console/stride`
-  also the `mqtt.*` broker seed and the four `stride.keystore*` signing lines. Without a keystore,
+  also the `mqtt.*` broker seed and the four signing properties (`stride.keystore`,
+  `stride.keystore.password`, `stride.key.alias`, `stride.key.password`). Without a keystore,
   the release variant builds unsigned and `run.sh` falls back to debug.
 - **Runtime:** everything else is set on the console's own screens and stored privately: Settings
   in `console/stride`, `ConsolePreferences` in the Lab. Setup baselines stay in the setup app's
@@ -337,8 +339,9 @@ records its evidence in the module README and in the validation snapshot below.
 Durable facts copied forward from the port log, the module READMEs and `CONTRIBUTING.md`. The
 originals are unchanged.
 
-- **Run `console/stride` through `run.sh`.** Calling `./gradlew` directly tends to fail in a way
-  that blames the wrong thing (`CONTRIBUTING.md`).
+- **Set `JAVA_HOME` before calling `./gradlew` in `console/stride`.** Without it, Gradle tends to
+  fail in a way that blames the wrong thing (`CONTRIBUTING.md`). `run.sh` sets it for you, but
+  it exits early when no device is attached, even for `./run.sh build`.
 - **`-PcompatLint` is not a full lint pass.** It checks only NewApi/InlinedApi. Unfiltered lint
   still reports the existing MissingPermission findings in `Ftms.kt` (`ANDROID_5_PORT.md`).
 - **ADB has to start over the LAN.** In cable tests, the console's external full-size USB port did

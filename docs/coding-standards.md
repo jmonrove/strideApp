@@ -16,7 +16,7 @@ the knowledge it references. Three languages live here: Kotlin (`console/`), Jav
 | Kotlin packages | `dev.stride.<module>`, one lowercase word | `dev.stride.lab`, `dev.stride.motorbench` |
 | Kotlin classes / objects / files | PascalCase; the file is named after its main class | `WorkoutEngine.kt`, `FitProConnection.kt` |
 | Kotlin functions / properties | camelCase | `acceptHeartRate()`, `canResumeManual` |
-| Kotlin constants | UPPER_SNAKE_CASE `const val`, in a `companion object` | `MIN_SAMPLES`, `READ_TIMEOUT_MS` |
+| Kotlin constants | UPPER_SNAKE_CASE `const val`, in a `companion object`. Exception: `console/setup`'s `object SetupPolicy` uses camelCase `const val`/`val`, so match that module there | `MIN_SAMPLES`, `READ_TIMEOUT_MS`; in setup, `vendorDebugAction` |
 | Kotlin enum values | UPPER_SNAKE_CASE | `State.SENSOR_HOLD` |
 | Kotlin tests | `<Class>Test.kt`; methods are camelCase behavior sentences | `staleSensorHoldsUntilExplicitResume()` |
 | Logcat tags | `Stride` + PascalCase area | `Stride`, `StrideBoardRead`, `StrideHistory` |
@@ -24,8 +24,8 @@ the knowledge it references. Three languages live here: Kotlin (`console/`), Jav
 | JS functions / variables | camelCase | `createDisplayRelay`, `inspectFrame` |
 | JS files | kebab-case; tests are `<name>.test.mjs` | `display-relay.js`, `stride-core.js`, `protocol.test.mjs` |
 | JSON fields (HTTP, watch messages) | camelCase, with the unit suffix | `sessionId`, `pollAgeMs`, `displayOnly` |
-| Enumerated string values (kinds, sources, quality) | snake_case | `hr_display`, `sense2_exercise`, `acquisition_unknown` |
-| HTTP endpoints | `/api/` + kebab-case | `/api/hr`, `/api/hr-display` |
+| Enumerated string values on the wire | Depends on the family; match the one you extend, because a value in the wrong case is rejected. Kotlin enum names go over the Lab bridge and HTTP as-is (UPPER_SNAKE, parsed with `valueOf`). Watch-message kinds, sources and quality values are snake_case | `PHONE`, `SIMULATED`; `hr_display`, `sense2_exercise`, `acquisition_unknown` |
+| HTTP routes (Lab `PreviewServer`) | Phone-UI routes are bare lowercase paths; sensor ingress lives under `/api/` in kebab-case | `/status`, `/routines`, `/action`; `/api/hr`, `/api/hr-display` |
 | Python modules / functions / variables | snake_case; Home Assistant scripts start with `stride_` | `console_access.py`, `stride_reminders.py` |
 | Python classes | PascalCase | `Access` |
 | Python constants | UPPER_SNAKE_CASE at module level | `MODEL`, `MARKER`, `PROPS` |
@@ -60,7 +60,8 @@ No formatter or linter config is checked in (no ktlint, detekt, Prettier or Blac
   existing lines.
 - **Kotlin:** compact, with expression-bodied functions and small `data class`es. `@Synchronized`
   marks the public entry points of state machines (`WorkoutEngine`). Validate configuration in
-  `init { require(...) }`.
+  `init { require(...) }`. `console/setup` is written denser still (no spaces around `=` in
+  declarations, one-line `defaultConfig`); keep that style inside that module.
 - **Doc comments:** KDoc `/** */` on classes and non-obvious functions; a module docstring at the
   top of each Python script; a block comment at the top of each console UI JS file explaining what
   it owns.
@@ -132,7 +133,8 @@ Two rules follow, and people skip the second:
 - [ ] Lint passes for Android modules, and still covers API 22
 - [ ] UI JS/CSS uses nothing newer than Chromium 83
 - [ ] No `Log.d`/`console.log` left behind that prints BPM, tokens or addresses
-- [ ] Nothing from CLAUDE.md rule 6 is staged (`git status` + `git diff --cached --stat`)
+- [ ] Nothing from CLAUDE.md rule 6 is staged. Read the `git diff --cached` content, not just
+      `--stat`, and check that `git config user.email` is the noreply identity
 - [ ] No check conflates "nothing found" with "couldn't look" (see the section above)
 - [ ] The status docs this change makes false are updated (see "Keeping status docs true" in
       `../CLAUDE.md`)

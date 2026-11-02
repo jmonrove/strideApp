@@ -48,7 +48,9 @@ then pull in only what your task needs via the routing table below.
 6. **This repo is public.** Never commit any of these: `local.properties`; keystores (`*.jks`,
    `*.keystore`, `*.p12`); `homeassistant/stride.conf`; broker credentials; Fitbit or SDK tokens;
    console IP addresses, boot IDs or serials; heart-rate or health values, or screenshots showing
-   them; extracted iFit or vendor binaries, or decompiled vendor code. Device evidence goes in
+   them; extracted iFit or vendor binaries, or decompiled vendor code. Commits use the GitHub
+   noreply identity (`32687858+jmonrove@users.noreply.github.com`), so check
+   `git config user.email` before committing. Device evidence goes in
    `../artifacts/`, outside the repo. Per-device baselines stay in the ignored `local/` directories.
 7. **Git: commit only when asked, and stage by explicit path, never with `git add -A`.** Ship only
    by following [`docs/runbooks/deploy.md`](docs/runbooks/deploy.md). Never push to `upstream`
@@ -98,9 +100,9 @@ same change:
 
 - **JDK / Android:** JDK 17 or 21 (`/usr/libexec/java_home -v 17`); Android SDK at `$ANDROID_HOME`
   (default `~/Library/Android/sdk`); compileSdk 34, minSdk 22, targetSdk 28. Each `console/<module>`
-  is its own Gradle root, so run `./gradlew` from inside it. For `console/stride`, use `./run.sh
-  build`: it sets `JAVA_HOME`, and calling `./gradlew` there directly tends to fail with a
-  misleading error.
+  is its own Gradle root, so run `./gradlew` from inside it. In `console/stride`, set
+  `JAVA_HOME` explicitly before `./gradlew`, because without it Gradle tends to fail with a
+  misleading error. `./run.sh` sets it for you, but needs a device even for `build`.
 - **Node:** `wearables/sense2`: `npm ci`, `npm test` (`node --test`), `npm run build` →
   `build/app.fba`. The Fitbit SDK is pinned (`@fitbit/sdk` 6.2.0-pre.1, `@fitbit/sdk-cli`
   1.8.0-pre.10); don't bump it.

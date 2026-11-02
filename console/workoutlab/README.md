@@ -32,13 +32,17 @@ compatibility findings.
 A device integration test drives the bundled display through its native bridge:
 
 ```sh
-ANDROID_SERIAL=<console-ip>:5555 ./gradlew :app:connectedDebugAndroidTest
+ANDROID_SERIAL=<console-ip>:5555 ./gradlew :app:connectedDebugAndroidTest \
+  -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
 ```
 
 It checks setup/start, the three visualizations, manual override and resume,
 manual-only operation without heart rate, settings and explicit history saves.
 This test exercises **simulation only** and cannot instantiate a motor driver.
 The test saves a synthetic session to verify persistence, then restores the prior history.
+Keep the `leaveApksInstalledAfterRun` flag on a console. Without it, the Android Gradle Plugin
+uninstalls `dev.stride.lab` after the run, which deletes its saved settings and history. Afterwards,
+remove the leftover `dev.stride.lab.test` package with `adb uninstall`.
 
 To install and open the APK:
 

@@ -33,9 +33,13 @@ Sense 2 watch is a separate hardware action that needs the developer's OK each t
      refuses to fast-forward, **stop and ask**. Don't create a merge commit, and don't rebase a
      branch that has been pushed.
    - If it prints anything else (`main`, or `HEAD` for a detached checkout), **stop and ask**.
-2. `git status --short` must show nothing staged or modified that is not part of this ship. Check
-   that `git diff origin/android-5-compat --stat` contains nothing from CLAUDE.md rule 6
-   (`local.properties`, keystores, `stride.conf`, addresses, health data, vendor binaries).
+2. `git status --short` must print nothing: only committed work ships. If anything is staged,
+   modified or untracked, **stop and ask**. Commits happen only when the developer asks.
+   Then read the full outgoing patch, `git diff origin/android-5-compat`, not just its file list.
+   It must contain nothing from CLAUDE.md rule 6 (`local.properties`, keystores, `stride.conf`,
+   credentials, addresses, boot IDs, health values, vendor binaries). Also,
+   `git log --format='%ae %ce' origin/android-5-compat..HEAD` must print only the noreply identity
+   from rule 6.
 3. Run the test and lint commands for every module the outgoing commits touch, from
    [`verify.md`](verify.md) § "Module checks". All must pass before you go on. If step 1 just ran
    them on this exact commit, you don't need to run them again.
@@ -66,7 +70,8 @@ These happen only when the developer asks, at that moment, with the developer pr
   `am start` line from the module README. Never install `dev.stride.hud`.
 - **Watch:** from `wearables/sense2`, run `npm run usb -- install`, then `npm run usb -- launch`.
 - Afterwards, record the build, date and outcome in the module README and the validation snapshot
-  in `docs/architecture.md`. Put the evidence file in `../artifacts/`.
+  in `docs/architecture.md`. Put the evidence file in the `artifacts/` folder beside the repo
+  (`$(git rev-parse --show-toplevel)/../artifacts/`).
 
 ## Do not
 
